@@ -7,7 +7,7 @@ description: Doctrine of the Plan-Critic -> Builder -> Reviewer -> Verifier pipe
 
 > **An agent that writes is never an agent that judges.**
 
-## The 14 rules, each backed by a measurement
+## The 15 rules, each backed by a measurement
 
 0. **The plan is checked before it is executed.** As soon as a plan, an approach or a task breakdown exists, a separate agent verifies it against the codebase: do the referenced files exist, is the step order workable, is a precondition missing, is the success criterion testable, was anything asked for dropped.
    *Evidence: the plan is the ceiling of the result. On the same code task, no planning phase 48.1% Pass@1, with a plan 60.3%, with a correct plan **74.4%** (arXiv 2303.06689). Grounded plan critique lifts TravelPlanner from 8.3% to 23.89% and NATURAL PLAN from 3.43% to 40% (LLM-Modulo, arXiv 2411.14484); with a strict verifier, 10% to 93.9% (NAACL 2025).*
@@ -49,8 +49,15 @@ description: Doctrine of the Plan-Critic -> Builder -> Reviewer -> Verifier pipe
     *Against adding agents: Agentless (arXiv 2407.01489) reaches 32.00% on SWE-bench Lite at $0.70 against CodeR's 28.33% at $3.34; MAST (NeurIPS 2025, arXiv 2503.13657) measures 41 to 86.7% failure rates across 7 state-of-the-art multi-agent systems; and the gain is NON-MONOTONIC, since on hard queries more calls degrades the result (NeurIPS 2024, arXiv 2403.02419).*
 
 12. **Mandatory metrics**: correct->incorrect flips, false-OK rate, points consumed, EIR per model.
+    *Two records, two levels of trust. `.betterzcode/evidence/<session>.jsonl` is written by the hooks: the model does not control it, so it is proof. `.betterzcode/plans/<run>/report.md` is written by the agent: it is readable and structured, but it is testimony. The gate reads only the first.*
+    *Comparing the two is what makes rule 12 measurable: the report claims a command ran, the hook log says whether it did.*
 
-13. **Honest baseline**: compare the pipeline against "N Builders + majority vote" at equal token budget, never against a lone Builder.
+13. **A subagent's proof cannot sign the main agent's verdict.** Whoever concludes runs the deciding command themselves, in the session that signs.
+    *Measured (2026-08-17): a Verifier ran 16 real verification commands - docker, build, the full curl scenario - inside its subagent. Not one appeared in the evidence log, because ZCode hooks do not fire inside subagents. The run only passed the gate because the main agent happened to have run `tsc --noEmit` itself.*
+    *Delegate the work, own the verdict.*
+
+14. **Honest baseline**: compare the pipeline against "N Builders + majority vote" at equal token budget, never against a lone Builder.
+    *Not yet run. Until it is, nobody knows whether this pipeline beats one good model called once, and this document says so rather than implying otherwise.*
 
 ## Model routing (measured on GLM Coding Plan, n=53, HumanEvalFix + QuixBugs)
 
