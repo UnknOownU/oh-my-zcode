@@ -55,7 +55,40 @@ It answers on five concrete points: do the referenced files exist, is the step o
 
 **Never argue with the critic and never overrule it silently.** If you think a finding is wrong, say so explicitly to the user with your reason, and let them decide.
 
-## Step 5: Deliver
+## Step 5: Persist it
+
+A validated plan that only exists in a chat scroll is lost the moment the session ends. Write it down.
+
+Create `.betterzcode/plans/<YYYYMMDD-HHMM>_<slug>_<session8>/plan.md` at the **project root** (the folder holding `.git` or `package.json`), where `<slug>` is three or four words from the Goal and `<session8>` is the first 8 characters of the session id.
+
+The file contains:
+
+```markdown
+# <Goal in one line>
+
+- **Session**: <full session id>
+- **Created**: <ISO timestamp>
+- **Status**: PLAN READY
+
+## Goal / Context / Constraints / Done when
+...
+
+## Plan
+1. ...
+
+## What the critic caught
+- round 1: <finding> -> <what changed>
+
+## Kept despite a flag
+- <finding> -> <why it was kept>
+
+## Deciding command
+```<the exact command that settles success>```
+```
+
+If `/betterswarm` later executes this plan, it writes `report.md` next to it, in the same folder.
+
+## Step 6: Deliver
 
 Present:
 
