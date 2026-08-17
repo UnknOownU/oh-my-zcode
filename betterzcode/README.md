@@ -1,7 +1,7 @@
 # BetterZcode
 
 > **An agent that writes is never an agent that judges.**
-> A Builder → Reviewer → Verifier pipeline with a hard evidence gate, and GLM model routing **grounded in measurements**, not impressions.
+> A Plan Critic → Builder → Reviewer → Verifier pipeline with a hard evidence gate, and GLM model routing **grounded in measurements**, not impressions.
 
 ## What it is
 
@@ -33,6 +33,7 @@ The orchestrator frames the task (Goal / Context / Constraints / Done-when), spl
 
 | Role | Model | Effort | Evidence |
 |---|---|---|---|
+| Plan Critic | `glm-5.3` | max | the plan is the ceiling: **48.1% → 74.4%** Pass@1 from plan quality alone. `max` is affordable here because a plan is short text |
 | Builder | `glm-5.3` | max | fastest and most capable of the real lineup |
 | Reviewer | `glm-5.3` | high | **6.2% false-reject** against 21–26% for all the others (n=53) |
 | Verifier | `glm-5.3` | high | glm-4.7 was removed after EXP-6: **77.8% false-reject** on real multi-file patches, defect named only **11.8%** of the time |
@@ -57,6 +58,7 @@ In **Settings → Plugins → betterzcode → Advanced info → Configuration**:
 
 | Key | Default | Effect |
 |---|---|---|
+| `planCriticModel` / `planCriticThought` | `glm-5.3` / `max` | Plan Critic model and effort |
 | `builderModel` / `builderThought` | `glm-5.3` / `max` | Builder model and effort |
 | `reviewerModel` / `reviewerThought` | `glm-5.3` / `high` | Reviewer model and effort |
 | `verifierModel` / `verifierThought` | `glm-5.3` / `high` | Verifier model and effort |
@@ -71,6 +73,7 @@ In **Settings → Plugins → betterzcode → Advanced info → Configuration**:
 betterzcode/
 ├── .zcode-plugin/plugin.json   manifest + userConfig
 ├── agents/
+│   ├── gate-plan-critic.md     glm-5.3 / max  — checks the plan before a line is written
 │   ├── gate-builder.md         glm-5.3 / max  — implements, never validates itself
 │   ├── gate-reviewer.md        glm-5.3 / high — commit-first, read-only, locked verdict
 │   └── gate-verifier.md        glm-5.3 / high — signs on execution evidence
