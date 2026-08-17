@@ -1,6 +1,6 @@
 {
   "name": "betterzcode",
-  "version": "1.2.1",
+  "version": "1.4.0",
   "description": "Your agent cannot call a task done without proving it. Separate agents check the plan, write the code, review it and verify it by execution, and a hook blocks any success verdict that no executed test, linter or build supports. An agent that writes is never an agent that judges.",
   "author": {
     "name": "UnknOownU",
@@ -18,79 +18,5 @@
   ],
   "agents": "agents",
   "commands": "commands",
-  "skills": "skills",
-  "userConfig": {
-    "planCriticModel": {
-      "title": "Plan critic model",
-      "type": "string",
-      "default": "glm-5.3",
-      "description": "Model for the Plan Critic, which checks a plan against the codebase before any code is written. Must be a separate agent from whoever wrote the plan: intrinsic self-correction drops one model from 75.8% to 41.8%, while the same model with external feedback climbs to 84.3% (Huang et al., ICLR 2024)."
-    },
-    "planCriticThought": {
-      "title": "Plan critic thinking level",
-      "type": "string",
-      "default": "max",
-      "description": "Thinking level for the Plan Critic. This is the one judging role that gets max, and deliberately so. max was ruled out for the Reviewer and the Verifier because EXP-6 measured it exceeding 240s on 72% of calls and costing 28.67 points on large multi-file patches: that cost is driven by input size, not by effort. A plan is short text, so the same effort is cheap here, and it applies to the highest-leverage point of the chain (48.1% -> 74.4% Pass@1 purely from plan quality, arXiv 2303.06689). Requires an unconstrained output budget, since max is also the most verbose setting."
-    },
-    "builderModel": {
-      "title": "Builder model",
-      "type": "string",
-      "default": "glm-5.3",
-      "description": "Model for the Builder. Measured: glm-5.3 is the fastest and most capable of the real lineup. Real alternatives: glm-4.7, glm-4.6."
-    },
-    "builderThought": {
-      "title": "Builder thinking level",
-      "type": "string",
-      "default": "max",
-      "description": "Thinking level for the Builder (low/high/max). max fits here because the Builder returns code, not a verdict: its output-format problem does not apply. Official Z.AI recommendation for code."
-    },
-    "reviewerModel": {
-      "title": "Reviewer model",
-      "type": "string",
-      "default": "glm-5.3",
-      "description": "Model for the Reviewer. Measured (n=53, HumanEvalFix+QuixBugs): glm-5.3 gives 6.2% false-reject against 21-26% for the 4.x family. Never use glm-5-turbo (3% measured false-OK)."
-    },
-    "reviewerThought": {
-      "title": "Reviewer thinking level",
-      "type": "string",
-      "default": "high",
-      "description": "Thinking level for the Reviewer. On 45 tasks with an unconstrained output budget, high and max tie (97.8% accuracy, 0% false-OK, 0% unparseable). EXP-6 breaks the tie on REAL multi-file patches: max times out in 72% of calls and costs 28.67 points per review. low is 6x cheaper but lets 3.3% of broken code through: forbidden for any role that signs."
-    },
-    "verifierModel": {
-      "title": "Verifier model",
-      "type": "string",
-      "default": "glm-5.3",
-      "description": "Model for the Verifier. Changed after EXP-6 (SWE-bench Verified, real repositories, multi-file patches): glm-4.7 returns FAIL on 94% of its verdicts there, rejects 77.8% of CORRECT code and names the actual defect only 11.8% of the time (independent judge). Its measured superiority on isolated functions does NOT generalise to real code."
-    },
-    "verifierThought": {
-      "title": "Verifier thinking level",
-      "type": "string",
-      "default": "high",
-      "description": "Thinking level for the Verifier. high is the only level measured at 0% false-OK AND 0% false-reject (EXP-4, n=45, unconstrained budget). max is ruled out: on real patches it exceeds 240s in 72% of calls. low and minimal are forbidden for any role that signs (4.2 to 8.3% measured false-OK)."
-    },
-    "confidenceGate": {
-      "title": "Confidence gate",
-      "type": "number",
-      "default": 80,
-      "description": "Builder confidence threshold (0-100). Above it: deterministic verification only. Below it: full review then verification."
-    },
-    "maxAgents": {
-      "title": "Max concurrent agents",
-      "type": "number",
-      "default": 9,
-      "description": "Global ceiling on concurrent agents. DyLAN (COLM 2024): 3 optimised agents (70.5%) beat 7 unoptimised ones (69.9%) for 52.9% fewer API calls. MacNet (ICLR 2025) fits a logistic curve over up to 1000 agents and finds 2^4 nodes a reasonable choice, with reverse degradation of 2.27 to 6.24% on some configurations."
-    },
-    "aggregateReviews": {
-      "title": "Independent reviews to aggregate",
-      "type": "number",
-      "default": 1,
-      "description": "Number of independent reviews to aggregate on critical areas, combined by MAJORITY VOTE, never by union. Aggregating 10 reviews gains +43.67% F1 and +118.83% recall (SWR-Bench, arXiv 2509.01494) but absolute F1 caps at 21.91% and precision stays poor (>7 false positives per PR). Union would amplify the over-rejection this pipeline already fights."
-    },
-    "maxOutputTokens": {
-      "title": "Output budget per call",
-      "type": "number",
-      "default": 65536,
-      "description": "Output budget per call. DO NOT LOWER. Measured: with a tight 2500 ceiling, 100% of the unparseable verdicts observed were responses cut off before the verdict line, which stalls the pipeline and drops apparent accuracy from 97.8% to 77.8%. The official Z.AI default is 65536, the ceiling 131072."
-    }
-  }
+  "skills": "skills"
 }
