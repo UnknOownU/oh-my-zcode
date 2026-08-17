@@ -49,6 +49,8 @@ It answers on five concrete points: do the referenced files exist, is the step o
 - `PLAN REVISE` → apply its fixes, then send it back.
 - `PLAN READY` → go to step 5.
 
+**Use its vocabulary, not the pipeline's.** The critic answers `PLAN READY` or `PLAN REVISE`. Never ask it for a `VERDICT: PASS` line and never write one yourself here: that phrasing is reserved for a verdict on executed code, and the evidence gate reads it literally. A validated plan is not executed code.
+
 **Three rounds maximum.** 96.5% of plans converge in three iterations or fewer (arXiv 2509.02761). If problems remain after the third, stop and present them to the user: some things need a human decision, and looping burns points without adding information.
 
 **Never argue with the critic and never overrule it silently.** If you think a finding is wrong, say so explicitly to the user with your reason, and let them decide.
