@@ -65,7 +65,43 @@ If the verdict is FAIL: back to step 1 with the evidence of failure.
 
 Repeat Builder -> Reviewer -> Verifier until both signatures are in. Then move to the next wave.
 
-At the end, produce a table: area / iteration count / final verdict / evidence commands.
+**Before you sign anything, run the deciding command yourself.** A subagent's commands are not traceable from this session, so the Verifier's sixteen proofs cannot back your signature: only what runs here can. Run the one command that settles it, quote its raw output and its exit code, then conclude.
+
+## Step 5: Write the run report
+
+At the **project root**, in `.betterzcode/plans/<YYYYMMDD-HHMM>_<slug>_<session8>/` (reuse the folder if `/betterplan` already created one), write `report.md`:
+
+```markdown
+# Run report - <Goal>
+
+- **Session**: <full session id>
+- **Finished**: <ISO timestamp>
+- **Final verdict**: PASS | FAIL
+
+## Verification checklist
+- [x] `npm run build` - exit 0
+      <the raw output, or its decisive lines>
+- [ ] `<command>` - not run, because <reason>
+
+## Per area
+| Area | Iterations | Reviewer | Verifier |
+|---|---|---|---|
+| ... | 2 | PASS | PASS |
+
+## Signed here, in this session
+- `<the deciding command you ran yourself>` - exit <code>
+
+## Not covered
+<what stayed untested, and why>
+```
+
+Then copy the session's evidence file, `.betterzcode/evidence/<session id>.jsonl`, into the same folder as `evidence.jsonl`. The original stays where it is.
+
+**A checked box must carry its command, its raw output and its exit code.** A box you tick without those is a claim, not a proof, and this report exists precisely to stop being believed on your word. The evidence file is written by the hooks and you do not control it: whoever reads both can tell them apart.
+
+## Step 6: Report to the user
+
+Produce a table: area / iteration count / final verdict / evidence commands, and give the path of the run folder.
 
 ## Hard rules of the pipeline
 
