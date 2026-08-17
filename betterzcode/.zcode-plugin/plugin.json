@@ -1,7 +1,7 @@
 {
   "name": "betterzcode",
-  "version": "1.1.0",
-  "description": "Four sealed roles (Plan Critic -> Builder -> Reviewer -> Verifier) and a hard evidence gate: no PASS verdict without an executed verification. An agent that writes is never an agent that judges, and a plan is never executed before it is checked.",
+  "version": "1.2.0",
+  "description": "Your agent cannot call a task done without proving it. Separate agents check the plan, write the code, review it and verify it by execution, and a hook blocks any success verdict that no executed test, linter or build supports. An agent that writes is never an agent that judges.",
   "author": {
     "name": "UnknOownU",
     "url": "https://github.com/UnknOownU"
