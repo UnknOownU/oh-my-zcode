@@ -23,11 +23,19 @@ Team distribution: push this folder to GitHub, then **Add marketplace** with the
 
 ## Use
 
-```
-/gate fix the orders API pagination, it skips the last page
-```
+Type `/better` in the input box to see both commands.
 
-The orchestrator frames the task (Goal / Context / Constraints / Done-when), splits it into areas, then runs Builder → Reviewer → Verifier until both signatures are in.
+```
+/betterplan  add a login page, sessions must survive a refresh
+```
+Writes a plan, has `gate-plan-critic` check it against the real code, iterates at most three times, and hands you a validated plan. **Writes no code.**
+
+```
+/betterswarm fix the orders API pagination, it skips the last page
+```
+The full pipeline: frames the task (Goal / Context / Constraints / Done-when), splits it into areas, checks the plan, then runs Builder → Reviewer → Verifier until both signatures are in. If you already ran `/betterplan`, it skips the plan check.
+
+You do not have to use either. The `SessionStart` hook injects the doctrine into every session, so the rules apply even when you just talk to the agent normally.
 
 ## The routing, and why
 
@@ -77,8 +85,10 @@ betterzcode/
 │   ├── gate-builder.md         glm-5.3 / max  — implements, never validates itself
 │   ├── gate-reviewer.md        glm-5.3 / high — commit-first, read-only, locked verdict
 │   └── gate-verifier.md        glm-5.3 / high — signs on execution evidence
-├── commands/gate.md            Builder → Reviewer → Verifier orchestration
-├── skills/evidence-gate/       the doctrine in 13 rules, each sourced
+├── commands/
+│   ├── betterplan.md           plan, checked against the codebase, no code written
+│   └── betterswarm.md          full Plan Critic → Builder → Reviewer → Verifier run
+├── skills/evidence-gate/       the doctrine in 14 rules, each sourced
 ├── hooks/                      doctrine injection + evidence log + the gate
 └── docs/                       routing.md + one sheet per model
 ```
