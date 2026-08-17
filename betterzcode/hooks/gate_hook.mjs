@@ -19,7 +19,8 @@
  * Robustness contract: NEVER break a session. Every exception is swallowed,
  * the exit code stays 0, and no output means "no effect".
  */
-import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 /** Injected on every session open: keep it short, it is paid for every time. */
@@ -30,6 +31,9 @@ const DOCTRINE =
   "A plan is never executed before it is checked: as soon as an implementation " +
   "plan, an approach or a task breakdown is produced, have gate-plan-critic " +
   "verify it against the codebase before the first file is edited. " +
+  "Before you sign off, run the deciding command yourself, in this session: a " +
+  "subagent's commands are not traceable from here, so its proof cannot back " +
+  "your signature. Delegate the work, own the verdict. " +
   "A PASS verdict citing no output from an actually executed command is void " +
   "and will be refused at the conclusion. " +
   "Every verdict ends with a final line, alone on its line: 'VERDICT: PASS' or " +
@@ -88,8 +92,49 @@ async function readPayload() {
   }
 }
 
+/**
+ * Anchor the log to the project root, never to the current directory.
+ *
+ * Measured in a real run (2026-08-17): agents worked from a subfolder, so the
+ * evidence split across three separate files and the gate read the wrong one.
+ * A proof written one directory down was invisible from the root.
+ */
+/** Windows hands out 8.3 short names, so compare resolved paths, not strings. */
+function samePath(a, b) {
+  const norm = (p) => {
+    let out = p;
+    try {
+      out = realpathSync.native ? realpathSync.native(p) : realpathSync(p);
+    } catch { /* path may not exist: fall back to the raw form */ }
+    out = out.replace(/[\\/]+$/, "");
+    return process.platform === "win32" ? out.toLowerCase() : out;
+  };
+  return norm(a) === norm(b);
+}
+
+function projectRoot(payload) {
+  const start = payload.cwd || process.cwd();
+  const home = homedir();
+  const markers = [".betterzcode", ".git", "package.json", "pyproject.toml", "go.mod", "Cargo.toml"];
+  let dir = start;
+  for (let hops = 0; hops < 12; hops += 1) {
+    // Never anchor at the user's home: a stray .betterzcode there would
+    // capture the evidence of every project on the machine.
+    if (samePath(dir, home)) break;
+    for (const m of markers) {
+      if (existsSync(join(dir, m))) return dir;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return start;
+}
+
+/** One log per session, addressable from the session id alone. */
 function evidencePath(payload) {
-  return join(payload.cwd || process.cwd(), ".betterzcode", "evidence.jsonl");
+  const sid = String(payload.session_id ?? "").replace(/[^\w.-]/g, "_") || "unknown";
+  return join(projectRoot(payload), ".betterzcode", "evidence", `${sid}.jsonl`);
 }
 
 /** Writes the protocol JSON to stdout. Nothing else may go there. */
@@ -98,6 +143,10 @@ function emit(obj) {
 }
 
 function log(payload, entry) {
+  // No session id means this is not a real turn: ZCode probes the hooks with an
+  // empty payload when the plugin loads. Measured: those probes wrote 22 junk
+  // lines into the user's home directory. Emit nothing, write nothing.
+  if (!payload.session_id) return;
   try {
     const line = {
       ...entry,
@@ -200,6 +249,9 @@ function onStop(payload) {
       "not proof: only a command that verifies counts (test suite, linter, type " +
       "checker, build). " +
       "Actually run one, quote its raw output and its exit code, then conclude. " +
+      "If a subagent already verified this, run the deciding command yourself: " +
+      "its commands are not traceable from this session, so they cannot back " +
+      "your signature. " +
       "If verification is impossible here, the verdict is FAIL with the reason, " +
       "never PASS by default.",
   });
