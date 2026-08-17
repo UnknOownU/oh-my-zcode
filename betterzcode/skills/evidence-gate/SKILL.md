@@ -7,7 +7,7 @@ description: Doctrine of the Plan-Critic -> Builder -> Reviewer -> Verifier pipe
 
 > **An agent that writes is never an agent that judges.**
 
-## The 13 rules, each backed by a measurement
+## The 14 rules, each backed by a measurement
 
 0. **The plan is checked before it is executed.** As soon as a plan, an approach or a task breakdown exists, a separate agent verifies it against the codebase: do the referenced files exist, is the step order workable, is a precondition missing, is the success criterion testable, was anything asked for dropped.
    *Evidence: the plan is the ceiling of the result. On the same code task, no planning phase 48.1% Pass@1, with a plan 60.3%, with a correct plan **74.4%** (arXiv 2303.06689). Grounded plan critique lifts TravelPlanner from 8.3% to 23.89% and NATURAL PLAN from 3.43% to 40% (LLM-Modulo, arXiv 2411.14484); with a strict verifier, 10% to 93.9% (NAACL 2025).*
