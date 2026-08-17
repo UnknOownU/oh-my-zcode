@@ -1,6 +1,6 @@
 {
   "name": "betterzcode",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Your agent cannot call a task done without proving it. Separate agents check the plan, write the code, review it and verify it by execution, and a hook blocks any success verdict that no executed test, linter or build supports. An agent that writes is never an agent that judges.",
   "author": {
     "name": "UnknOownU",
