@@ -1,7 +1,7 @@
 {
   "name": "betterzcode",
-  "version": "1.0.0",
-  "description": "Three sealed roles (Builder -> Reviewer -> Verifier) and a hard evidence gate: no PASS verdict without an executed verification. An agent that writes is never an agent that judges.",
+  "version": "1.1.0",
+  "description": "Four sealed roles (Plan Critic -> Builder -> Reviewer -> Verifier) and a hard evidence gate: no PASS verdict without an executed verification. An agent that writes is never an agent that judges, and a plan is never executed before it is checked.",
   "author": {
     "name": "UnknOownU",
     "url": "https://github.com/UnknOownU"
@@ -20,6 +20,18 @@
   "commands": "commands",
   "skills": "skills",
   "userConfig": {
+    "planCriticModel": {
+      "title": "Plan critic model",
+      "type": "string",
+      "default": "glm-5.3",
+      "description": "Model for the Plan Critic, which checks a plan against the codebase before any code is written. Must be a separate agent from whoever wrote the plan: intrinsic self-correction drops one model from 75.8% to 41.8%, while the same model with external feedback climbs to 84.3% (Huang et al., ICLR 2024)."
+    },
+    "planCriticThought": {
+      "title": "Plan critic thinking level",
+      "type": "string",
+      "default": "max",
+      "description": "Thinking level for the Plan Critic. This is the one judging role that gets max, and deliberately so. max was ruled out for the Reviewer and the Verifier because EXP-6 measured it exceeding 240s on 72% of calls and costing 28.67 points on large multi-file patches: that cost is driven by input size, not by effort. A plan is short text, so the same effort is cheap here, and it applies to the highest-leverage point of the chain (48.1% -> 74.4% Pass@1 purely from plan quality, arXiv 2303.06689). Requires an unconstrained output budget, since max is also the most verbose setting."
+    },
     "builderModel": {
       "title": "Builder model",
       "type": "string",
