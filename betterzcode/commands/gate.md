@@ -3,7 +3,7 @@ description: Runs the BetterZcode pipeline (Builder -> Reviewer -> Verifier) on 
 argument-hint: "[task description]"
 ---
 
-# /gate: Builder -> Reviewer -> Verifier
+# /gate: Plan Critic -> Builder -> Reviewer -> Verifier
 
 Requested task: **$ARGUMENTS**
 
@@ -19,6 +19,18 @@ Restate the task in four parts. If one is missing, ask for it now:
 - **Done when**: the verifiable completion criterion
 
 Then split it into **independent areas** (an area is a file scope that does not overlap with the others). Three parallel areas maximum by default: DyLAN (COLM 2024) measures 3 optimised agents (70.5%) beating 7 unoptimised ones (69.9%) for 52.9% fewer API calls, and MacNet (ICLR 2025) fits a logistic curve where 2^4 nodes is already a reasonable ceiling.
+
+## Step 0.5: PLAN CRITIC (before any code)
+
+Once the areas are defined, you have a plan. Do not execute it yet.
+
+Delegate to `gate-plan-critic`. Pass it the four parts and the planned steps. It checks against the codebase: do the referenced files exist, is the step order workable, is a precondition missing, is the success criterion testable, was anything dropped.
+
+If it returns `PLAN REVISE`: fix the plan with its concrete fixes, then send it back. **Three rounds maximum** (96.5% of plans converge in 3 or fewer); after that, surface the remaining problems to the user and let them decide.
+
+If it returns `PLAN READY`: proceed to step 1.
+
+Skip this step only for a change confined to a single file with an obvious criterion. A wrong plan is the one defect no downstream role can catch: the Builder executes it, the Reviewer compares the code to it, the Verifier tests against it.
 
 ## Step 1: BUILDER (per area)
 
