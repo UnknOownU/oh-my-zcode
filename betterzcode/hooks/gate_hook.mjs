@@ -27,6 +27,9 @@ const DOCTRINE =
   "Evidence-gated pipeline active. Three sealed roles: the Builder writes, " +
   "the Reviewer judges in a fresh context, the Verifier proves by executing. " +
   "Hard rule: whoever produces an artifact never signs its own verdict. " +
+  "A plan is never executed before it is checked: as soon as an implementation " +
+  "plan, an approach or a task breakdown is produced, have gate-plan-critic " +
+  "verify it against the codebase before the first file is edited. " +
   "A PASS verdict citing no output from an actually executed command is void " +
   "and will be refused at the conclusion. " +
   "Every verdict ends with a final line, alone on its line: 'VERDICT: PASS' or " +
