@@ -60,20 +60,23 @@ The `Stop` hook blocks a conclusion that claims `VERDICT: PASS` when no **verifi
 
 Both refinements come from real sessions, not theory. The first version counted any command, so the agent's opening `ls` disarmed it for the whole session. The second matched the phrase `VERDICT: PASS` anywhere in the text, so it blocked an agent that was correctly *refusing* to sign. Both cases are now frozen as regression tests.
 
-## Configuration
+## Changing the routing
 
-In **Settings → Plugins → betterzcode → Advanced info → Configuration**:
+Each role's model and thinking level live in one place: the agent's frontmatter, in `agents/*.md`.
 
-| Key | Default | Effect |
-|---|---|---|
-| `planCriticModel` / `planCriticThought` | `glm-5.3` / `max` | Plan Critic model and effort |
-| `builderModel` / `builderThought` | `glm-5.3` / `max` | Builder model and effort |
-| `reviewerModel` / `reviewerThought` | `glm-5.3` / `high` | Reviewer model and effort |
-| `verifierModel` / `verifierThought` | `glm-5.3` / `high` | Verifier model and effort |
-| `confidenceGate` | 80 | above: deterministic verification only; below: full review |
-| `maxAgents` | 9 | ceiling on concurrent agents |
-| `aggregateReviews` | 1 | independent reviews to aggregate on critical areas, by majority vote |
-| `maxOutputTokens` | 65536 | **do not lower**: a tight budget cuts the response before the verdict line |
+```yaml
+model: glm-5.3
+thoughtLevel: high
+```
+
+There is deliberately **no settings panel**. ZCode only substitutes `${user_config.key}` into MCP declarations, and this plugin ships no MCP server, so a settings field would render a knob that turns nothing. One source of truth beats two that can disagree.
+
+`validate_zcode.mjs` fails if the routing table above ever stops matching the agent files, which is a bug this plugin shipped once already.
+
+Two settings are not knobs but rules, and they are enforced in the prompts:
+
+- **Never lower the output budget.** Measured: with a 2500-token ceiling, 100% of unparseable verdicts were responses cut off before the verdict line, dropping apparent accuracy from 97.8% to 77.8%.
+- **Never route a judging role to `glm-5-turbo`** (3% measured false-OK) **or `glm-4.7` on multi-file code** (77.8% measured false-reject).
 
 ## Contents
 
@@ -88,14 +91,33 @@ betterzcode/
 ├── commands/
 │   ├── betterplan.md           plan, checked against the codebase, no code written
 │   └── betterswarm.md          full Plan Critic → Builder → Reviewer → Verifier run
-├── skills/evidence-gate/       the doctrine in 14 rules, each sourced
+├── skills/evidence-gate/       the doctrine in 15 rules, each sourced
 ├── hooks/                      doctrine injection + evidence log + the gate
 └── docs/                       routing.md + one sheet per model
 ```
 
-## Evidence log
+## What lands on disk
 
-The hooks write every executed shell command and its exit code to `.betterzcode/evidence.jsonl` in the workspace. That is what lets you cross-check a Verifier signature against what actually happened — rule 12 of the doctrine (mandatory metrics), and what the gate itself reads to decide.
+```
+.betterzcode/
+├── evidence/
+│   └── <session id>.jsonl                    written by the HOOKS - proof
+└── plans/
+    └── 20260818-0020_login-page_91ab6d08/
+        ├── plan.md         the validated plan + what the critic caught
+        ├── report.md       run report: checkboxes, command, raw output, exit code
+        └── evidence.jsonl  frozen copy of the session log at close
+```
+
+**Two records, two levels of trust.** The hook log is written by the runtime and the model cannot touch it: that is proof. The report is written by the agent: it is readable and structured, but it is testimony. **The gate reads only the hook log.**
+
+Keeping both is the point: the report claims a command ran, the hook log says whether it did. That gap is measurable, and it is what makes rule 12 (mandatory metrics) real rather than aspirational.
+
+The log is anchored to the **project root**, not the current directory, so a proof written from a subfolder is still visible from the top. Add `.betterzcode/` to your `.gitignore` unless you want the runs in version control.
+
+### One limitation, stated plainly
+
+**ZCode hooks do not fire inside subagents.** Measured on a real run: a Verifier executed 16 verification commands — docker, build, a full curl scenario — and not one reached the log. So the doctrine requires the main agent to run the deciding command itself before signing. Delegate the work, own the verdict.
 
 ## Development
 
