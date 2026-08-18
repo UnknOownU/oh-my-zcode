@@ -1,294 +1,295 @@
-# Routing GLM — quel modèle pour quel rôle
+# GLM Routing — which model for which role
 
-> **Source de vérité de ce document** : mesures faites le 2026-08-17 sur le compte GLM Coding Plan de l'utilisateur
-> (endpoint `https://api.z.ai/api/coding/paas/v4`), croisées avec la littérature 2024-2026.
-> Tout chiffre marqué **[MESURÉ]** vient de nos propres runs (données brutes dans `exp/`).
-> Tout chiffre marqué **[PUBLIÉ]** vient d'un papier ou d'un leaderboard, avec sa référence.
+> **Source of truth for this document**: measurements taken on 2026-08-17 on the user's GLM Coding Plan account
+> (endpoint `https://api.z.ai/api/coding/paas/v4`), cross-referenced with the 2024–2026 literature.
+> Every figure marked **[MEASURED]** comes from our own runs (raw data in `exp/`).
+> Every figure marked **[PUBLISHED]** comes from a paper or a leaderboard, with its reference.
 
 ---
 
-## 0. TL;DR — la matrice de routing
+## 0. TL;DR — the routing matrix
 
-| Rôle | Modèle | Effort | Pourquoi (preuve) |
+| Role | Model | Effort | Why (evidence) |
 |---|---|---|---|
-| **WORKER** (écrit le code) | `glm-5.3` | `max` | Meilleur modèle de la palette sur les benchmarks agentiques **[PUBLIÉ]** ; recommandation officielle Z.AI pour le code |
-| **REVIEWER** (relit, ne code pas) | `glm-5.3` en **contexte frais** | `high` | **0 % de faux-OK et 6,2 % de faux-rejet contre 21-26 % pour tous les autres [MESURÉ]** ; 2,5× plus rapide |
-| **QA** (exécute, prouve) | `glm-5.3` | `high` | ⚠️ **Changé après EXP-6** : sur de vrais patchs multi-fichiers, glm-4.7 rejette 78 % du code correct et n'identifie le vrai défaut que 11,8 % du temps **[MESURÉ]** (voir §3quater) |
-| **Fallback QA / recon rapide** | `glm-5-turbo` | `low` | Le moins cher en tokens **[MESURÉ]** — mais **jamais en Reviewer** (voir §3) |
-| **JAMAIS Reviewer** | `glm-5-turbo` | — | Seul modèle à approuver du code défectueux (3 % faux-OK) **[MESURÉ]** + pire reviewer sur 5 modèles dans arXiv 2606.15689 **[PUBLIÉ]** |
+| **WORKER** (writes the code) | `glm-5.3` | `max` | Best model of the lineup on agentic benchmarks **[PUBLISHED]**; official Z.AI recommendation for code |
+| **REVIEWER** (reviews, does not code) | `glm-5.3` in a **fresh context** | `high` | **0% false-OK and 6.2% false-reject vs 21–26% for all the others [MEASURED]**; 2.5× faster |
+| **QA** (executes, proves) | `glm-5.3` | `high` | ⚠️ **Changed after EXP-6**: on real multi-file patches, glm-4.7 rejects 78% of correct code and identifies the real defect only 11.8% of the time **[MEASURED]** (see §3quater) |
+| **SOURCE VERIFIER** (confronts a claim with its source) | `glm-5.3` | `high` | Same 0% false-OK / 0% false-reject configuration as the other judging roles **[MEASURED]**; and the capability floor is load-bearing: the same citation-repair protocol scores 90.7% with a frontier model against 79.3% with a mid-size one, called "not yet on-par" by its authors **[PUBLISHED]** |
+| **Fallback QA / fast recon** | `glm-5-turbo` | `low` | Cheapest in tokens **[MEASURED]** — but **never as Reviewer** (see §3) |
+| **NEVER Reviewer** | `glm-5-turbo` | — | Only model that approves defective code (3% false-OK) **[MEASURED]** + worst reviewer of 5 models in arXiv 2606.15689 **[PUBLISHED]** |
 
 ---
 
-## 1. La palette réelle (et pourquoi elle n'est pas celle de la doc)
+## 1. The real lineup (and why it is not the one in the docs)
 
-**[MESURÉ]** En interrogeant chaque ID puis en lisant le champ `model` de la réponse HTTP :
+**[MEASURED]** By querying each ID then reading the `model` field of the HTTP response:
 
-| ID demandé | Répond réellement | Statut |
+| ID requested | Actually answers | Status |
 |---|---|---|
-| `glm-4.5` | `glm-4.5` | ✅ modèle réel |
-| `glm-4.6` | `glm-4.6` | ✅ modèle réel |
-| `glm-4.7` | `glm-4.7` | ✅ modèle réel |
-| `glm-5-turbo` | `glm-5-turbo` | ✅ modèle réel |
-| `glm-5.3` | `glm-5.3` | ✅ modèle réel |
+| `glm-4.5` | `glm-4.5` | ✅ real model |
+| `glm-4.6` | `glm-4.6` | ✅ real model |
+| `glm-4.7` | `glm-4.7` | ✅ real model |
+| `glm-5-turbo` | `glm-5-turbo` | ✅ real model |
+| `glm-5.3` | `glm-5.3` | ✅ real model |
 | `glm-4.5-air` | `glm-4.7` | 🔀 alias |
 | `glm-5` | `glm-5.3` | 🔀 alias |
 | `glm-5.1` | `glm-5.3` | 🔀 alias |
 | `glm-5.2` | `glm-5.3` | 🔀 alias |
-| `glm-5.2-highspeed` | HTTP 429 / code 1311 | ⛔ existe, hors plan |
-| `glm-5.3[1m]` | HTTP 400 / code 1214 | ⛔ convention ZCode, pas un ID API |
-| `glm-4.7-flash` | HTTP 429 / code 1305 | ⛔ hors plan |
+| `glm-5.2-highspeed` | HTTP 429 / code 1311 | ⛔ exists, off-plan |
+| `glm-5.3[1m]` | HTTP 400 / code 1214 | ⛔ ZCode convention, not an API ID |
+| `glm-4.7-flash` | HTTP 429 / code 1305 | ⛔ off-plan |
 
-**Trois sources se contredisent, une seule dit vrai :**
-- `GET /models` annonce **9 modèles** → faux (4 sont des alias)
-- La doc officielle annonce **3 modèles** (5.3, 5-turbo, 4.7) → faux aussi (4.5 et 4.6 répondent bien en leur nom)
-- **La mesure dit 5 modèles distincts** → c'est la seule vérité exploitable
+**Three sources contradict each other, only one tells the truth:**
+- `GET /models` announces **9 models** → false (4 are aliases)
+- The official docs announce **3 models** (5.3, 5-turbo, 4.7) → also false (4.5 and 4.6 do answer under their own names)
+- **The measurement says 5 distinct models** → that is the only usable truth
 
-⚠️ **Conséquence critique pour le plugin** : écrire `model: glm-5.2` dans un subagent ZCode ne donne PAS GLM-5.2, ça donne GLM-5.3. Toute config de routing qui « diversifie » avec 5.1/5.2 est une illusion : c'est le même modèle. La diversité réelle n'existe qu'entre **{4.5, 4.6, 4.7} × {5-turbo} × {5.3}**.
+⚠️ **Critical consequence for the plugin**: writing `model: glm-5.2` in a ZCode subagent does NOT give GLM-5.2, it gives GLM-5.3. Any routing config that "diversifies" with 5.1/5.2 is an illusion: it is the same model. Real diversity only exists between **{4.5, 4.6, 4.7} × {5-turbo} × {5.3}**.
 
-**Pour débloquer les vrais 5.1/5.2** : il faut créditer l'API standard (`api.z.ai/api/paas/v4`, aujourd'hui en `1113 Insufficient balance`) — 5.2 et 5.1 y sont à 1,40 $/4,40 $ par M de tokens **[PUBLIÉ]**.
+**To unlock the real 5.1/5.2**: you must credit the standard API (`api.z.ai/api/paas/v4`, today at `1113 Insufficient balance`) — 5.2 and 5.1 are there at $1.40/$4.40 per M tokens **[PUBLISHED]**.
 
 ---
 
-## 2. Le rôle REVIEWER — la décision la mieux étayée
+## 2. The REVIEWER role — the best-supported decision
 
-**Protocole [MESURÉ]** : 53 tâches issues de **HumanEvalFix** (OctoPack, ICLR 2024) et **QuixBugs** (SPLASH 2017), labels reprouvés par exécution des tests officiels sur la machine (164/164 HumanEvalFix reproduits). Chaque modèle rend un verdict PASS/FAIL. Température 0, `max_tokens` 5000.
+**Protocol [MEASURED]**: 53 tasks from **HumanEvalFix** (OctoPack, ICLR 2024) and **QuixBugs** (SPLASH 2017), labels re-proven by executing the official tests on the machine (164/164 HumanEvalFix reproduced). Each model returns a PASS/FAIL verdict. Temperature 0, `max_tokens` 5000.
 
-### 2.1 Sur code défectueux + correct (n=53, 33 défectueux / 20 corrects)
+### 2.1 On defective + correct code (n=53, 33 defective / 20 correct)
 
-| Modèle | Accuracy | IC 95 % | Faux-OK | Faux-rejet | Bug identifié | Illisible | Latence | Tokens |
+| Model | Accuracy | 95% CI | False-OK | False-reject | Bug identified | Unparseable | Latency | Tokens |
 |---|---|---|---|---|---|---|---|---|
-| glm-4.5 | 90,6 % | [79,7–95,9] | 0 % | 25,0 % | 75,8 % | 0 % | 56,9 s | 3616 |
-| glm-4.6 | 90,6 % | [79,7–95,9] | 0 % | 25,0 % | 78,8 % | 0 % | 59,0 s | 3841 |
-| glm-4.7 | 92,3 % | [81,8–97,0] | 0 % | 21,1 % | **78,8 %** | 0 % | 51,9 s | 3450 |
-| glm-5-turbo | 90,6 % | [79,7–95,9] | **3,0 %** ⛔ | 15,0 % | 45,5 % | 1,9 % | 40,7 s | **1497** |
-| **glm-5.3** | 90,6 % | [79,7–95,9] | **0 %** | **5,0 %** | 60,6 % | 7,5 % | **26,2 s** | 2270 |
+| glm-4.5 | 90.6% | [79.7–95.9] | 0% | 25.0% | 75.8% | 0% | 56.9 s | 3616 |
+| glm-4.6 | 90.6% | [79.7–95.9] | 0% | 25.0% | 78.8% | 0% | 59.0 s | 3841 |
+| glm-4.7 | 92.3% | [81.8–97.0] | 0% | 21.1% | **78.8%** | 0% | 51.9 s | 3450 |
+| glm-5-turbo | 90.6% | [79.7–95.9] | **3.0%** ⛔ | 15.0% | 45.5% | 1.9% | 40.7 s | **1497** |
+| **glm-5.3** | 90.6% | [79.7–95.9] | **0%** | **5.0%** | 60.6% | 7.5% | **26.2 s** | 2270 |
 
-### 2.2 Sur code exclusivement correct (n=53) — le test du sur-rejet
+### 2.2 On exclusively correct code (n=53) — the over-rejection test
 
-| Modèle | **Faux-rejet** | IC 95 % | Tokens de sortie/review | Latence |
+| Model | **False-reject** | 95% CI | Output tokens/review | Latency |
 |---|---|---|---|---|
-| glm-4.5 | 26,4 % | [16,4–39,6] | 4591 | 76,9 s |
-| glm-4.6 | 25,0 % | [15,2–38,2] | 4510 | 80,2 s |
-| glm-5-turbo | 22,6 % | [13–36] | 1838 | 68,7 s |
-| glm-4.7 | 21,4 % | [11,7–35,9] | 4137 | 70,7 s |
-| **glm-5.3** | **6,2 %** | [2–17] | 2343 | **27,8 s** |
+| glm-4.5 | 26.4% | [16.4–39.6] | 4591 | 76.9 s |
+| glm-4.6 | 25.0% | [15.2–38.2] | 4510 | 80.2 s |
+| glm-5-turbo | 22.6% | [13–36] | 1838 | 68.7 s |
+| glm-4.7 | 21.4% | [11.7–35.9] | 4137 | 70.7 s |
+| **glm-5.3** | **6.2%** | [2–17] | 2343 | **27.8 s** |
 
-**Lecture :** l'accuracy ne discrimine rien (tous à 90-92 %, IC superposés). **Le discriminant est le mode d'échec.** La famille 4.x rejette du code correct **1 fois sur 4**. glm-5.3 : 1 fois sur 16. Facteur **3,5 à 4,3×**.
+**Reading:** accuracy discriminates nothing (all at 90–92%, overlapping CIs). **The discriminant is the failure mode.** The 4.x family rejects correct code **1 time out of 4**. glm-5.3: 1 time out of 16. Factor **3.5 to 4.3×**.
 
-**Cohérent avec la littérature** : la sur-correction est le mode d'échec dominant des reviewers LLM (FNR jusqu'à 73,2 % avec des prompts riches, arXiv 2508.12358) **[PUBLIÉ]** — pas le rubber-stamping. Nos GLM confirment : **0 % de faux-OK partout sauf 5-turbo**, alors que la littérature mesure 31-44 % de faux-OK sur GPT-4o/Gemini (Cihan et al. 2025) **[PUBLIÉ]**. **Les GLM sont des reviewers conservateurs, pas complaisants.**
+**Consistent with the literature**: over-correction is the dominant failure mode of LLM reviewers (FNR up to 73.2% with rich prompts, arXiv 2508.12358) **[PUBLISHED]** — not rubber-stamping. Our GLMs confirm it: **0% false-OK everywhere except 5-turbo**, whereas the literature measures 31–44% false-OK on GPT-4o/Gemini (Cihan et al. 2025) **[PUBLISHED]**. **The GLMs are conservative reviewers, not complacent ones.**
 
-### 2.3 Validation croisée externe de l'exclusion de glm-5-turbo
+### 2.3 External cross-validation of excluding glm-5-turbo
 
-| Source | Verdict sur GLM-5-Turbo en reviewer |
+| Source | Verdict on GLM-5-Turbo as reviewer |
 |---|---|
-| **[MESURÉ]** nous | Seul modèle avec faux-OK (3 %), identification de bug la plus faible (45,5 %) |
-| **[PUBLIÉ]** arXiv 2606.15689 (2026) | Dernier de 5 modèles : F1 0,310 (n=150), **F1 0,008 sur vrais PRs**, verbosité la plus haute (841 tokens), qualité la plus basse (2,37) |
+| **[MEASURED]** us | Only model with a false-OK (3%), lowest bug identification (45.5%) |
+| **[PUBLISHED]** arXiv 2606.15689 (2026) | Last of 5 models: F1 0.310 (n=150), **F1 0.008 on real PRs**, highest verbosity (841 tokens), lowest quality (2.37) |
 
-Deux méthodologies indépendantes, même conclusion → **exclusion ferme du rôle Reviewer et QA-signature.**
+Two independent methodologies, same conclusion → **firm exclusion from the Reviewer and QA-signature role.**
 
 ---
 
-## 3. Le protocole de prompt (commit-first) — testé, effet réel mais modeste
+## 3. The prompt protocol (commit-first) — tested, real but modest effect
 
-**[MESURÉ]** sur le bench local (26 tâches), naive vs commit-first (critères d'acceptation énoncés AVANT de voir le code + spec répétée en fin de prompt) :
+**[MEASURED]** on the local bench (26 tasks), naive vs commit-first (acceptance criteria stated BEFORE seeing the code + spec repeated at the end of the prompt):
 
-| Modèle | Accuracy naive → commit-first | Faux-rejet naive → commit-first |
+| Model | Accuracy naive → commit-first | False-reject naive → commit-first |
 |---|---|---|
-| glm-4.5 | 96,2 % → **100 %** | 9,1 % → **0 %** |
-| glm-4.7 | 92,3 % → **100 %** | 9,1 % → **0 %** |
-| glm-4.6 | 96,2 % → 96,2 % | 9,1 % → 9,1 % |
-| glm-5-turbo | 96,2 % → 96,2 % | 9,1 % → 9,1 % |
-| glm-5.3 | 100 % → 92,3 % | 0 % → 0 % (mais 7,7 % de verdicts illisibles) |
+| glm-4.5 | 96.2% → **100%** | 9.1% → **0%** |
+| glm-4.7 | 92.3% → **100%** | 9.1% → **0%** |
+| glm-4.6 | 96.2% → 96.2% | 9.1% → 9.1% |
+| glm-5-turbo | 96.2% → 96.2% | 9.1% → 9.1% |
+| glm-5.3 | 100% → 92.3% | 0% → 0% (but 7.7% unparseable verdicts) |
 
-**Conclusion honnête** : le commit-first **supprime les faux-rejets sur 4.5 et 4.7** (9,1 → 0 %), n'a pas d'effet sur 4.6/5-turbo, et **dégrade 5.3 par non-respect du format de sortie** (verdict noyé dans une réponse longue). Les écarts sont dans le bruit de mesure (±12,5 pp mesuré sur n=26).
+**Honest conclusion**: commit-first **removes the false-rejects on 4.5 and 4.7** (9.1 → 0%), has no effect on 4.6/5-turbo, and **degrades 5.3 through output-format non-compliance** (verdict drowned in a long response). The gaps are within measurement noise (±12.5 pp measured on n=26).
 
-➡️ **Décision plugin** : commit-first activé pour les rôles tournant sur 4.x ; pour 5.3, on garde la structure mais on **verrouille le format de sortie** (le verdict doit être la dernière ligne, seul sur sa ligne) car c'est sa faiblesse mesurée (7,5-10,4 % d'illisibles).
+➡️ **Plugin decision**: commit-first enabled for the roles running on 4.x; for 5.3, keep the structure but **lock the output format** (the verdict must be the last line, alone on its line) because that is its measured weakness (7.5–10.4% unparseable).
 
 ---
 
-## 3bis. Le niveau de thinking — mesuré, et contre-intuitif
+## 3bis. The thinking level — measured, and counter-intuitive
 
-> ⚠️ **Ce tableau a été mesuré avec un budget de sortie bridé (bug de plafond à 2500 tokens).** Il est conservé pour la traçabilité, mais **ses conclusions sur `max` sont fausses** : les 22,2 % de « verdicts illisibles » étaient des réponses **coupées avant la ligne de verdict**, pas un défaut du modèle. Après correction (EXP-4, budget 131072), `high` **et** `max` montent tous deux à 97,8 % d'accuracy avec 0 % de faux-OK et 0 % d'illisible. Voir la décision corrigée en fin de section.
+> ⚠️ **This table was measured with a throttled output budget (a 2500-token ceiling bug).** It is kept for traceability, but **its conclusions about `max` are false**: the 22.2% "unparseable verdicts" were responses **cut off before the verdict line**, not a model defect. After the fix (EXP-4, budget 131072), `high` **and** `max` both climb to 97.8% accuracy with 0% false-OK and 0% unparseable. See the corrected decision at the end of the section.
 
-**[MESURÉ]** glm-5.3 sur 45 tâches du bench standard, même prompt, seul `reasoning_effort` varie :
+**[MEASURED]** glm-5.3 on 45 tasks of the standard bench, same prompt, only `reasoning_effort` varies:
 
-| Effort | Accuracy | IC 95 % | **Faux-OK** | **Faux-rejet** | **Verdicts illisibles** | Latence | Points/review |
+| Effort | Accuracy | 95% CI | **False-OK** | **False-reject** | **Unparseable verdicts** | Latency | Points/review |
 |---|---|---|---|---|---|---|---|
-| `low` | **91,1 %** | [79,3–96,5] | **6,7 %** ⛔ | 13,3 % | **0 %** | **5,6 s** | **0,77** |
-| **`high`** | 86,7 % | [73,8–93,7] | **0 %** ✅ | **0 %** ✅ | 13,3 % | 18,5 s | 3,62 |
-| `max` | 75,6 % | [61,3–85,8] | 3,3 % | 0 % | **22,2 %** ⚠️ | 19,1 s | 3,66 |
+| `low` | **91.1%** | [79.3–96.5] | **6.7%** ⛔ | 13.3% | **0%** | **5.6 s** | **0.77** |
+| **`high`** | 86.7% | [73.8–93.7] | **0%** ✅ | **0%** ✅ | 13.3% | 18.5 s | 3.62 |
+| `max` | 75.6% | [61.3–85.8] | 3.3% | 0% | **22.2%** ⚠️ | 19.1 s | 3.66 |
 
-### Trois enseignements
+### Three lessons
 
-1. **`max` est le pire des trois.** Accuracy la plus basse, 22,2 % de verdicts illisibles, coût le plus élevé. Mécanisme identifié : plus le modèle réfléchit, plus il rédige long, et plus la ligne de verdict finale se noie. **La recommandation officielle Z.AI (`max` pour le code) est inadaptée à un rôle qui doit rendre un verdict structuré** — elle vaut pour la génération de code, pas pour le jugement.
+1. **`max` is the worst of the three.** Lowest accuracy, 22.2% unparseable verdicts, highest cost. Mechanism identified: the more the model thinks, the longer it writes, and the more the final verdict line gets drowned. **The official Z.AI recommendation (`max` for code) is unsuited to a role that must return a structured verdict** — it holds for code generation, not for judgment.
 
-2. **`low` est un piège de vitesse.** Il est 3,3× plus rapide et 4,7× moins cher, avec 0 % d'illisibles… mais **6,7 % de faux-OK** : il laisse passer du code cassé. Sur un premier échantillon de n=16 il affichait 0 % de faux-OK — c'était de la chance d'échantillonnage. **Leçon méthodologique : ne jamais conclure sur n=16.**
+2. **`low` is a speed trap.** It is 3.3× faster and 4.7× cheaper, with 0% unparseable… but **6.7% false-OK**: it lets broken code through. On a first n=16 sample it showed 0% false-OK — that was sampling luck. **Methodological lesson: never conclude on n=16.**
 
-3. **`high` est le seul niveau à 0 % de faux-OK ET 0 % de faux-rejet.** Sa seule faiblesse (13,3 % d'illisibles) est **réparable par le prompt** — un budget de 400 mots et une contrainte de dernière ligne. Un faux-OK, lui, n'est pas réparable.
+3. **`high` is the only level at 0% false-OK AND 0% false-reject.** Its only weakness (13.3% unparseable) is **fixable by the prompt** — a 400-word budget and a last-line constraint. A false-OK, on the other hand, is not fixable.
 
-### Décision
+### Decision
 
-| Rôle | Effort | Raison |
+| Role | Effort | Reason |
 |---|---|---|
-| **Reviewer / QA** (portent un verdict) | **`high`** | à budget non bridé, `high` et `max` sont à égalité (97,8 %, 0 % faux-OK) ; **EXP-6 départage sur du vrai code** : `max` y expire dans 72 % des cas et coûte 28,67 points/review |
-| **Worker** (produit du code) | **`max`** | le problème de format ne le concerne pas : il rend du code, pas un verdict |
-| **Tri / reconnaissance rapide** | `low` | 4,7× moins cher, 3,3× plus rapide — **interdit de signature** |
+| **Reviewer / QA** (carry a verdict) | **`high`** | at an unthrottled budget, `high` and `max` tie (97.8%, 0% false-OK); **EXP-6 breaks the tie on real code**: `max` there expires in 72% of cases and costs 28.67 points/review |
+| **Worker** (produces code) | **`max`** | the format problem does not concern it: it returns code, not a verdict |
+| **Triage / fast recon** | `low` | 4.7× cheaper, 3.3× faster — **forbidden to sign** |
 
-**Comparaison inter-modèles à effort par défaut** (n=16, même tâche) :
+**Cross-model comparison at default effort** (n=16, same task):
 
-| Configuration | Accuracy | Faux-OK | Latence | Points |
+| Configuration | Accuracy | False-OK | Latency | Points |
 |---|---|---|---|---|
-| glm-5.3 @low | 100 % | 0 % | 5,5 s | 0,84 |
-| glm-5-turbo (défaut) | 100 % | 0 % | 18,7 s | 1,78 |
-| glm-5-turbo **nothink** | 93,8 % | **6,2 %** ⛔ | 3,1 s | 0,25 |
-| glm-4.7 (défaut) | 100 % | 0 % | **44,2 s** | **4,82** |
+| glm-5.3 @low | 100% | 0% | 5.5 s | 0.84 |
+| glm-5-turbo (default) | 100% | 0% | 18.7 s | 1.78 |
+| glm-5-turbo **nothink** | 93.8% | **6.2%** ⛔ | 3.1 s | 0.25 |
+| glm-4.7 (default) | 100% | 0% | **44.2 s** | **4.82** |
 
-➡️ **glm-4.7 coûte 5,7× plus cher et est 8× plus lent que glm-5.3@low à accuracy égale.** Il reste en QA pour sa qualité d'identification de défaut (78,8 %) et ses 0 % d'illisibles, mais c'est un choix assumé de fiabilité descriptive, pas d'efficacité.
-➡️ **`glm-5-turbo` sans thinking reproduit exactement le piège de `low`** : rapide, quasi gratuit, et il tamponne (6,2 % de faux-OK).
+➡️ **glm-4.7 costs 5.7× more and is 8× slower than glm-5.3@low at equal accuracy.** It stays in QA for its defect-identification quality (78.8%) and its 0% unparseable, but that is a deliberate choice of descriptive reliability, not efficiency.
+➡️ **`glm-5-turbo` without thinking reproduces exactly the `low` trap**: fast, near-free, and it rubber-stamps (6.2% false-OK).
 
 ---
 
-## 3ter. EXP-5 — le duel QA : glm-5.3 contre glm-4.7 sur **tous** les modes
+## 3ter. EXP-5 — the QA duel: glm-5.3 against glm-4.7 across **all** modes
 
-**[MESURÉ]** 2 modèles × 8 modes de réflexion × 24 tâches (HumanEvalFix + QuixBugs), budget de sortie non contraint.
+**[MEASURED]** 2 models × 8 thinking modes × 24 tasks (HumanEvalFix + QuixBugs), unconstrained output budget.
 
-| Configuration | Accuracy | Faux-OK | Faux-rejet | **Défaut identifié** | Latence | Points |
+| Configuration | Accuracy | False-OK | False-reject | **Defect identified** | Latency | Points |
 |---|---|---|---|---|---|---|
-| **glm-4.7 nothink** | **100 %** | 0 % | 0 % | **79,2 %** 🏆 | **6,4 s** | **0,42** 🏆 |
-| glm-4.7 @minimal | 100 % | 0 % | 0 % | 75,0 % | 37,9 s | 3,85 |
-| glm-4.7 @max | 100 % | 0 % | 0 % | 75,0 % | 38,5 s | 3,95 |
-| glm-4.7 @high | 100 % | 0 % | 0 % | 70,8 % | 38,7 s | 3,87 |
-| glm-5.3 @xhigh | 100 % | 0 % | 0 % | 54,2 % | 15,9 s | 3,25 |
-| glm-5.3 @max | 100 % | 0 % | 0 % | 45,8 % | 19,5 s | 4,17 |
-| glm-5.3 @medium | 100 % | 0 % | 0 % | 41,7 % | 7,2 s | 1,33 |
-| glm-5.3 nothink | 100 % | 0 % | 0 % | 37,5 % | 5,0 s | 0,65 |
-| glm-5.3 @minimal | 91,7 % | **8,3 %** ⛔ | 0 % | 45,8 % | 4,9 s | 0,65 |
-| glm-5.3 @low | 95,8 % | **4,2 %** ⛔ | 0 % | 29,2 % | 5,0 s | 0,62 |
+| **glm-4.7 nothink** | **100%** | 0% | 0% | **79.2%** 🏆 | **6.4 s** | **0.42** 🏆 |
+| glm-4.7 @minimal | 100% | 0% | 0% | 75.0% | 37.9 s | 3.85 |
+| glm-4.7 @max | 100% | 0% | 0% | 75.0% | 38.5 s | 3.95 |
+| glm-4.7 @high | 100% | 0% | 0% | 70.8% | 38.7 s | 3.87 |
+| glm-5.3 @xhigh | 100% | 0% | 0% | 54.2% | 15.9 s | 3.25 |
+| glm-5.3 @max | 100% | 0% | 0% | 45.8% | 19.5 s | 4.17 |
+| glm-5.3 @medium | 100% | 0% | 0% | 41.7% | 7.2 s | 1.33 |
+| glm-5.3 nothink | 100% | 0% | 0% | 37.5% | 5.0 s | 0.65 |
+| glm-5.3 @minimal | 91.7% | **8.3%** ⛔ | 0% | 45.8% | 4.9 s | 0.65 |
+| glm-5.3 @low | 95.8% | **4.2%** ⛔ | 0% | 29.2% | 5.0 s | 0.62 |
 
-### Trois conclusions
+### Three conclusions
 
-1. **glm-4.7 domine glm-5.3 sur l'identification du défaut dans TOUS ses modes.** Son pire mode (54,2 % @low) égale le meilleur mode de glm-5.3 (54,2 % @xhigh). Écart au meilleur réglage de chacun : **+41,7 points**. Pour un rôle QA dont la mission est d'**expliquer ce qui casse**, c'est décisif.
+1. **glm-4.7 dominates glm-5.3 on defect identification across ALL its modes.** Its worst mode (54.2% @low) matches glm-5.3's best mode (54.2% @xhigh). Gap at each one's best setting: **+41.7 points**. For a QA role whose mission is to **explain what breaks**, that is decisive.
 
-2. **Le thinking est un pur coût sur cette tâche.** glm-4.7 fait 100 % avec ou sans — mais sans, il est **6× plus rapide et 9,4× moins cher**, et il identifie *mieux* le défaut (79,2 % vs 75,0 %). Le raisonnement interne se substitue au rapport explicite au lieu de l'enrichir.
+2. **Thinking is pure cost on this task.** glm-4.7 scores 100% with or without — but without, it is **6× faster and 9.4× cheaper**, and it identifies the defect *better* (79.2% vs 75.0%). Internal reasoning substitutes for the explicit report instead of enriching it.
 
-3. **Les modes bas de glm-5.3 sont dangereux** : `@minimal` produit 8,3 % de faux-OK, `@low` 4,2 %. glm-4.7 n'en produit dans **aucun** de ses 8 modes.
+3. **glm-5.3's low modes are dangerous**: `@minimal` produces 8.3% false-OK, `@low` 4.2%. glm-4.7 produces none in **any** of its 8 modes.
 
-### Réserve méthodologique
+### Methodological caveat
 
-n=24 et **toutes les configurations saturent à 100 %** d'accuracy (IC [86,2–100] partout). L'accuracy ne discrimine donc rien ici. Ce qui discrimine, ce sont **l'identification du défaut, la latence et le coût** — trois métriques aux écarts massifs (jusqu'à ×9,4) et non ambigus.
+n=24 and **all configurations saturate at 100%** accuracy (CI [86.2–100] everywhere). Accuracy therefore discriminates nothing here. What discriminates is **defect identification, latency and cost** — three metrics with massive (up to ×9.4) and unambiguous gaps.
 
 ---
 
-## 3quater. EXP-6 — l'épreuve de vérité : de vrais patchs, de vrais dépôts
+## 3quater. EXP-6 — the moment of truth: real patches, real repositories
 
-Les sections précédentes reposent toutes sur des **fonctions isolées** (HumanEvalFix, QuixBugs). C'est la limite n°3 de cette étude. EXP-6 la lève.
+The previous sections all rest on **isolated functions** (HumanEvalFix, QuixBugs). That is limitation #3 of this study. EXP-6 lifts it.
 
-**Protocole [MESURÉ]** : **SWE-bench Verified** (500 instances validées par des humains, issues de vrais dépôts : Django, SymPy, scikit-learn…). Le patch de référence (`gold`) est présenté tel quel, ou **amputé d'un morceau entier** (un fichier complet, ou un hunk si le patch est mono-fichier). Le reviewer doit dire PASS sur le patch complet et FAIL sur l'amputé. Un **juge indépendant** (`glm-4.6` sans réflexion) vérifie ensuite si la review a nommé **le morceau réellement manquant** — cette métrique remplace le comptage de mots-clés, biaisé par la verbosité (r = +0,604).
+**Protocol [MEASURED]**: **SWE-bench Verified** (500 human-validated instances from real repositories: Django, SymPy, scikit-learn…). The reference patch (`gold`) is presented as-is, or **amputated of a whole piece** (a complete file, or a hunk if the patch is single-file). The reviewer must say PASS on the complete patch and FAIL on the amputated one. An **independent judge** (`glm-4.6` without reasoning) then checks whether the review named **the actually missing piece** — this metric replaces keyword counting, which is biased by verbosity (r = +0.604).
 
-> ⚠️ **SWE-bench Lite est inutilisable ici** : ses 300 instances sont *filtrées pour être mono-fichier* par construction. Sur 300, **0 patch multi-fichiers**. D'où le passage à Verified.
+> ⚠️ **SWE-bench Lite is unusable here**: its 300 instances are *filtered to be single-file* by construction. Out of 300, **0 multi-file patches**. Hence the move to Verified.
 
-### Résultat (n=18 patchs corrects + 18 amputés, 2 à 4 morceaux par patch)
+### Result (n=18 correct patches + 18 amputated, 2 to 4 pieces per patch)
 
-| Configuration | Appels réussis | Accuracy | **Faux-OK** | **Faux-rejet** | **Défaut identifié** *(juge)* | Latence | Points |
+| Configuration | Successful calls | Accuracy | **False-OK** | **False-reject** | **Defect identified** *(judge)* | Latency | Points |
 |---|---|---|---|---|---|---|---|
-| **glm-4.7 sans réflexion** | **36/36** | 55,6 % | 11,1 % | **77,8 %** ⛔ | **11,8 %** ⛔ | 16,7 s | 1,72 |
-| glm-5.3 effort max | **10/36** ⚠️ | 70,0 % | 50,0 % | 16,7 % | 50,0 % | 148,6 s | 28,67 |
+| **glm-4.7 without reasoning** | **36/36** | 55.6% | 11.1% | **77.8%** ⛔ | **11.8%** ⛔ | 16.7 s | 1.72 |
+| glm-5.3 effort max | **10/36** ⚠️ | 70.0% | 50.0% | 16.7% | 50.0% | 148.6 s | 28.67 |
 
-### Ce que ça renverse
+### What it overturns
 
-1. **glm-4.7 sans réflexion est une machine à rejeter.** Il rend **FAIL sur 34 de ses 36 verdicts (94 %)**. Sa « détection » de 89 % sur les patchs amputés n'est donc pas de la compétence — c'est un biais : rejeter systématiquement attrape mécaniquement tous les cassés. Le juge indépendant le confirme : il ne nomme le morceau réellement manquant que **11,8 %** du temps. **Il rejette pour de mauvaises raisons.**
+1. **glm-4.7 without reasoning is a rejection machine.** It returns **FAIL on 34 of its 36 verdicts (94%)**. Its 89% "detection" on the amputated patches is therefore not skill — it is a bias: systematically rejecting mechanically catches all the broken ones. The independent judge confirms it: it names the actually missing piece only **11.8%** of the time. **It rejects for the wrong reasons.**
 
-2. **L'ordre s'inverse par rapport à EXP-5.** Sur fonction isolée, glm-4.7 identifiait le défaut à 79,2 % contre 45,8 % pour glm-5.3. Sur du vrai code multi-fichiers : **11,8 % contre 50,0 %**. La supériorité de glm-4.7 en description **ne généralise pas** à du code réel.
+2. **The order reverses relative to EXP-5.** On isolated functions, glm-4.7 identified the defect at 79.2% vs 45.8% for glm-5.3. On real multi-file code: **11.8% vs 50.0%**. glm-4.7's superiority in description **does not generalize** to real code.
 
-3. **Cet écart était annoncé par les benchmarks publics** — que nos mesures sur fonctions isolées contredisaient : Terminal-Bench 41 % (4.7) contre 56,2 % (5.3), SWE-bench Verified 73,8 % contre 77,8 % **[PUBLIÉ]**. **Sur des tâches réalistes, les benchmarks publics avaient raison et notre micro-bench avait tort.**
+3. **This gap was announced by the public benchmarks** — which our isolated-function measurements contradicted: Terminal-Bench 41% (4.7) vs 56.2% (5.3), SWE-bench Verified 73.8% vs 77.8% **[PUBLISHED]**. **On realistic tasks, the public benchmarks were right and our micro-bench was wrong.**
 
-4. **glm-5.3 @max est opérationnellement impraticable sur ce format** : **72 % de ses appels dépassent 240 s** (latence mesurée 66 s / 165 s / 236 s) et il coûte **28,67 points par review**, soit 17× glm-4.7. Ses métriques ci-dessus reposent sur n=10 et **ne sont pas concluantes** — elles sont indiquées pour transparence, pas comme preuve.
+4. **glm-5.3 @max is operationally impractical on this format**: **72% of its calls exceed 240 s** (measured latency 66 s / 165 s / 236 s) and it costs **28.67 points per review**, i.e. 17× glm-4.7. Its metrics above rest on n=10 and **are not conclusive** — they are shown for transparency, not as proof.
 
-### Décision
+### Decision
 
-- **glm-4.7 est retiré de tout rôle portant un verdict sur du code multi-fichiers.**
-- **Le QA passe sur `glm-5.3` @high** — le seul effort mesuré à 0 % de faux-OK *et* 0 % de faux-rejet (EXP-4, n=45), et un compromis latence/coût tenable face au `max` qui expire.
-- **Prévoir un timeout d'au moins 900 s** côté client pour tout verdict sur un patch réaliste : 240 s est insuffisant (mesuré).
+- **glm-4.7 is removed from any role carrying a verdict on multi-file code.**
+- **QA moves to `glm-5.3` @high** — the only effort measured at 0% false-OK *and* 0% false-reject (EXP-4, n=45), and a tenable latency/cost trade-off against the `max` that expires.
+- **Plan for a timeout of at least 900 s** on the client side for any verdict on a realistic patch: 240 s is insufficient (measured).
 
-### Réserve honnête
+### Honest caveat
 
-Le défaut injecté est **une amputation** (un morceau retiré), pas un bug sémantique subtil. C'est un défaut *détectable par lecture structurelle*, ce qui **avantage** un reviewer attentif. Que glm-4.7 échoue sur ce cas facile est d'autant plus parlant ; mais on ne peut pas en déduire le comportement sur un bug logique fin. Et n=10 côté glm-5.3 interdit toute conclusion chiffrée sur ce modèle.
-
----
-
-## 4. Coût réel par rôle (points du Coding Plan)
-
-Multiplicateurs officiels **[PUBLIÉ]** (`points = (in×M_in + cached×M_cached + out×M_out)/10 000`) :
-
-| Modèle | M_in | M_cached | M_out |
-|---|---|---|---|
-| glm-5.3 | 6,9 | 1,7 | 24 |
-| glm-5-turbo | 5,7 | 1,5 | 21 |
-| glm-4.7 | 4,6 | 1,2 | 16 |
-
-**[MESURÉ]** tokens réels par review (prompt ≈ 290 tokens) :
-
-| Modèle | Tokens sortie/review | **Points/review** | Latence |
-|---|---|---|---|
-| glm-4.5 | 4591 | ~7,5 | 76,9 s |
-| glm-4.6 | 4510 | ~7,4 | 80,2 s |
-| glm-4.7 | 4137 | **~6,8** | 70,7 s |
-| glm-5-turbo | 1838 | ~4,0 | 68,7 s |
-| glm-5.3 | 2343 | ~5,8 | **27,8 s** |
-
-⚠️ **Le vrai poste de coût, c'est la verbosité** : les 4.x crachent ~4500 tokens de sortie pour un prompt de 290 (**ratio ×15**). Sur un multiplicateur output de 16-24, c'est là que partent les points.
-
-**Leviers de réduction mesurables :**
-1. **Plafonner `max_tokens`** des rôles Reviewer à ~1200 → coupe la verbosité 4.x d'environ 70 %
-2. **Off-peak** : ×0,5 sur tout, hors 14h-18h UTC+8 en semaine **[PUBLIÉ]**
-3. **Cache de prompt** : multiplicateur cached 3,5 à 4× plus bas que l'input → **garder les system prompts des agents strictement identiques d'un appel à l'autre** (recommandation officielle Z.AI : les différences de formatage cassent le cache)
-4. **Router par confiance** : ne déclencher le Reviewer complet que sur les artefacts à faible confiance
+The injected defect is **an amputation** (a piece removed), not a subtle semantic bug. It is a defect *detectable by structural reading*, which **favors** an attentive reviewer. That glm-4.7 fails on this easy case is all the more telling; but one cannot infer its behavior on a fine logic bug from it. And n=10 on the glm-5.3 side forbids any quantified conclusion about that model.
 
 ---
 
-## 5. Ce que dit la littérature sur GLM en position de juge (et ce qu'elle ne dit pas)
+## 4. Real cost per role (Coding Plan points)
 
-| Benchmark | GLM présent ? | Résultat |
+Official multipliers **[PUBLISHED]** (`points = (in×M_in + cached×M_cached + out×M_out)/10 000`):
+
+| Model | M_in | M_cached | M_out |
+|---|---|---|---|
+| glm-5.3 | 6.9 | 1.7 | 24 |
+| glm-5-turbo | 5.7 | 1.5 | 21 |
+| glm-4.7 | 4.6 | 1.2 | 16 |
+
+**[MEASURED]** real tokens per review (prompt ≈ 290 tokens):
+
+| Model | Output tokens/review | **Points/review** | Latency |
+|---|---|---|---|
+| glm-4.5 | 4591 | ~7.5 | 76.9 s |
+| glm-4.6 | 4510 | ~7.4 | 80.2 s |
+| glm-4.7 | 4137 | **~6.8** | 70.7 s |
+| glm-5-turbo | 1838 | ~4.0 | 68.7 s |
+| glm-5.3 | 2343 | ~5.8 | **27.8 s** |
+
+⚠️ **The real cost driver is verbosity**: the 4.x models spit out ~4500 output tokens for a 290-token prompt (**ratio ×15**). On an output multiplier of 16–24, that is where the points go.
+
+**Measurable reduction levers:**
+1. **Cap `max_tokens`** of the Reviewer roles at ~1200 → cuts 4.x verbosity by about 70%
+2. **Off-peak**: ×0.5 on everything, outside 2pm–6pm UTC+8 on weekdays **[PUBLISHED]**
+3. **Prompt cache**: cached multiplier 3.5 to 4× lower than input → **keep the agents' system prompts strictly identical from one call to the next** (official Z.AI recommendation: formatting differences break the cache)
+4. **Route by confidence**: trigger the full Reviewer only on low-confidence artifacts
+
+---
+
+## 5. What the literature says about GLM as a judge (and what it does not)
+
+| Benchmark | GLM present? | Result |
 |---|---|---|
-| **IF-RewardBench** (2603.04738, 2026) | ✅ GLM-4.6, GLM-4.5-Air | GLM-4.6 : 0,270 vs Gemini-3-Flash 0,513, GPT-5-mini 0,456 → **juge faible-à-moyen** |
-| **WebDevJudge** (2510.18560) | ✅ GLM-4.5 | pairwise 68,65 vs GPT-4.1 70,34, humain 84,56 → mid-pack |
-| **CodeCriticBench** (2502.16614) | ✅ GLM-4-Plus | 61,55 % vs GPT-4o 68,06 / Claude-3.5 68,79 |
-| **AACR-Bench** (2601.19494, 2026) | ✅ GLM-4.7 | F1 16,03 sans contexte (meilleur non-Claude), recall 27,57 %, précision 11,30 % |
-| **arXiv 2606.15689** (2026) | ✅ GLM-5-Turbo | dernier de 5, F1 0,008 sur vrais PRs |
-| ProcessBench, CriticBench, JudgeBench, RewardBench/2, RM-Bench, JETTS | ❌ **aucun GLM** | zones grises comblées par nos mesures |
-| **Sycophancie** (SycEval, SYCON, ELEPHANT, Beacon...) | ❌ **aucun GLM** | **zone grise totale** — non mesurée ici non plus |
+| **IF-RewardBench** (2603.04738, 2026) | ✅ GLM-4.6, GLM-4.5-Air | GLM-4.6: 0.270 vs Gemini-3-Flash 0.513, GPT-5-mini 0.456 → **weak-to-medium judge** |
+| **WebDevJudge** (2510.18560) | ✅ GLM-4.5 | pairwise 68.65 vs GPT-4.1 70.34, human 84.56 → mid-pack |
+| **CodeCriticBench** (2502.16614) | ✅ GLM-4-Plus | 61.55% vs GPT-4o 68.06 / Claude-3.5 68.79 |
+| **AACR-Bench** (2601.19494, 2026) | ✅ GLM-4.7 | F1 16.03 without context (best non-Claude), recall 27.57%, precision 11.30% |
+| **arXiv 2606.15689** (2026) | ✅ GLM-5-Turbo | last of 5, F1 0.008 on real PRs |
+| ProcessBench, CriticBench, JudgeBench, RewardBench/2, RM-Bench, JETTS | ❌ **no GLM** | gray zones filled by our measurements |
+| **Sycophancy** (SycEval, SYCON, ELEPHANT, Beacon...) | ❌ **no GLM** | **total gray zone** — not measured here either |
 
-**Calibration [PUBLIÉ]** : arXiv 2505.14489 compare GLM-Z1-0414 (raisonneur) à GLM-4-0414 → les modèles à raisonnement expriment mieux leur confiance (33/36 configurations). Cohérent avec notre choix d'un 5.3 en Reviewer.
+**Calibration [PUBLISHED]**: arXiv 2505.14489 compares GLM-Z1-0414 (reasoner) to GLM-4-0414 → reasoning models express their confidence better (33/36 configurations). Consistent with our choice of a 5.3 as Reviewer.
 
-**Nuance agentique importante [PUBLIÉ]** : sur τ²-bench telecom, **GLM-4.6 SANS reasoning (76,9 %) bat GLM-4.6 AVEC reasoning (70,5 %)**. Le thinking n'est pas systématiquement bénéfique — d'où le réglage d'effort par rôle plutôt qu'un `max` global.
+**Important agentic nuance [PUBLISHED]**: on τ²-bench telecom, **GLM-4.6 WITHOUT reasoning (76.9%) beats GLM-4.6 WITH reasoning (70.5%)**. Thinking is not systematically beneficial — hence the per-role effort setting rather than a global `max`.
 
 ---
 
-## 6. Chaînes de fallback
+## 6. Fallback chains
 
 ```
 WORKER    : glm-5.3 (max)      → glm-4.7 (high)     → glm-4.6 (high)
 REVIEWER  : glm-5.3 (high)     → glm-4.6 (high, +commit-first)  → glm-4.5
-QA        : glm-5.3 (high)     → glm-4.6 (high)     → glm-5-turbo (low, sans droit de signature)
+QA        : glm-5.3 (high)     → glm-4.6 (high)     → glm-5-turbo (low, no signing rights)
 ```
 
-**Règles dures :**
-- `glm-5-turbo` ne signe jamais un verdict de conformité (faux-OK mesuré)
-- **`glm-4.7` ne porte jamais un verdict sur du code multi-fichiers** (78 % de faux-rejet mesuré, §3quater) — il reste excellent en Worker et en explication de fonction isolée
-- Si un rôle de verdict tourne sur 4.x → activer commit-first (supprime ses faux-rejets sur fonction isolée)
-- Si un rôle de verdict tourne sur 5.3 → verrouiller le format du verdict (sa faiblesse mesurée)
-- Ne jamais router un rôle vers `glm-5.2`/`glm-5.1`/`glm-5`/`glm-4.5-air` : ce sont des alias, la diversité serait fictive
+**Hard rules:**
+- `glm-5-turbo` never signs a compliance verdict (measured false-OK)
+- **`glm-4.7` never carries a verdict on multi-file code** (78% measured false-reject, §3quater) — it stays excellent as Worker and for explaining an isolated function
+- If a verdict role runs on 4.x → enable commit-first (removes its false-rejects on isolated functions)
+- If a verdict role runs on 5.3 → lock the verdict format (its measured weakness)
+- Never route a role to `glm-5.2`/`glm-5.1`/`glm-5`/`glm-4.5-air`: these are aliases, the diversity would be fictitious
 
-⚠️ **Les trois rôles tournent sur glm-5.3.** La diversité de modèles a été *testée* (EXP-5 puis EXP-6) et **rejetée par les mesures** : le seul candidat crédible pour diversifier (glm-4.7) s'effondre sur du vrai code. La diversité réelle du pipeline vient donc du **contexte frais** et des **efforts distincts**, pas du modèle.
+⚠️ **All three roles run on glm-5.3.** Model diversity was *tested* (EXP-5 then EXP-6) and **rejected by the measurements**: the only credible candidate to diversify (glm-4.7) collapses on real code. The pipeline's real diversity therefore comes from **fresh context** and **distinct efforts**, not from the model.
 
 ---
 
-## 7. Limites de cette étude (honnêteté méthodologique)
+## 7. Limits of this study (methodological honesty)
 
-1. **n=53 par modèle** : les IC restent larges. Les écarts d'accuracy (90,6 vs 92,3 %) ne sont **pas** significatifs ; seuls les écarts de faux-rejet (6,2 % vs 21-26 %) et de latence/coût le sont.
-2. **Bruit de mesure établi à ±12,5 pp** sur n=26 (mesuré accidentellement en interrogeant 4 alias du même modèle) → tout écart inférieur à ~25 pp sur cette taille est du bruit.
-3. ~~**Bugs Python d'algorithmique** : la généralisation à un vrai dépôt reste à établir.~~ → **Levée en partie par EXP-6** (SWE-bench Verified, vrais dépôts, patchs multi-fichiers), qui a **invalidé la conclusion QA tirée des fonctions isolées**. Restent non couverts : bugs de concurrence, d'I/O et de sécurité.
-   ➡️ **Leçon méthodologique majeure de cette étude** : un micro-benchmark sur fonctions isolées peut produire un classement **inversé** par rapport au code réel. Nos EXP-1 à EXP-5 désignaient glm-4.7 comme meilleur QA ; EXP-6 l'a disqualifié. Ne jamais router un rôle de production sur la seule foi d'un bench de fonctions isolées.
-4. **Une seule exécution par cellule** (pas de répétitions) — la variance intra-modèle n'est pas mesurée sur le bench standard.
-5. **Non testé faute de budget** : EIR (taux d'introduction d'erreur en révision), review croisée worker→reviewer, sycophancie sous pression de l'auteur.
-6. **Températures à 0** : les résultats peuvent différer en usage réel (ZCode ne fixe pas la température).
+1. **n=53 per model**: the CIs stay wide. The accuracy gaps (90.6 vs 92.3%) are **not** significant; only the false-reject (6.2% vs 21–26%) and latency/cost gaps are.
+2. **Measurement noise established at ±12.5 pp** on n=26 (measured accidentally by querying 4 aliases of the same model) → any gap below ~25 pp at this size is noise.
+3. ~~**Python algorithmic bugs**: generalization to a real repository remains to be established.~~ → **Partially lifted by EXP-6** (SWE-bench Verified, real repositories, multi-file patches), which **invalidated the QA conclusion drawn from isolated functions**. Still uncovered: concurrency, I/O and security bugs.
+   ➡️ **Major methodological lesson of this study**: a micro-benchmark on isolated functions can produce a ranking **inverted** relative to real code. Our EXP-1 to EXP-5 designated glm-4.7 as the best QA; EXP-6 disqualified it. Never route a production role on the sole faith of an isolated-function bench.
+4. **A single run per cell** (no repetitions) — intra-model variance is not measured on the standard bench.
+5. **Not tested for lack of budget**: EIR (error-introduction rate in review), cross worker→reviewer review, sycophancy under author pressure.
+6. **Temperatures at 0**: results may differ in real use (ZCode does not fix the temperature).
