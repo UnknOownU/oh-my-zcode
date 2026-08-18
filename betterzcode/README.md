@@ -1,13 +1,18 @@
 # BetterZcode
 
-> **An agent that writes is never an agent that judges.**
-> A Plan Critic → Builder → Reviewer → Verifier pipeline with a hard evidence gate, and GLM model routing **grounded in measurements**, not impressions.
+> **An agent that writes is never an agent that judges. A source it never opened is not a source.**
+> A Plan Critic → Builder → Reviewer → Verifier pipeline with a hard evidence gate, a research command with a hard citation gate, and GLM model routing **grounded in measurements**, not impressions.
 
 ## What it is
 
-Three isolated ZCode subagents, an orchestration command, a doctrine skill, and hooks that turn the doctrine into something the runtime actually enforces. Every design decision is backed either by a measurement made on a GLM Coding Plan account or by a cited paper.
+Five isolated ZCode subagents, three orchestration commands, two doctrine skills, and hooks that turn the doctrine into something the runtime actually enforces. Every design decision is backed either by a measurement made on a GLM Coding Plan account or by a cited paper.
 
-**The part nothing else does**: a `Stop` hook refuses to let a turn end on `VERDICT: PASS` when no verification command ran during that turn. Not a prompt asking nicely — a gate.
+**The part nothing else does** — two gates that block instead of asking nicely:
+
+- a `Stop` hook refuses to let a turn end on `VERDICT: PASS` when no verification command ran during that turn;
+- the same hook refuses `SOURCES: VERIFIED` when the turn cites a page that was never fetched.
+
+The second one appears to be unique. Read at source level, no production research harness — LangChain's `open_deep_research`, GPT-Researcher, STORM, smolagents, `deep-research` — verifies that a cited source supports the claim. They state citation rules in a prompt and check none of them.
 
 ## Install (local test)
 
@@ -23,7 +28,7 @@ Team distribution: push this folder to GitHub, then **Add marketplace** with the
 
 ## Use
 
-Type `/better` in the input box to see both commands.
+Type `/better` in the input box to see the three commands.
 
 ```
 /betterplan  add a login page, sessions must survive a refresh
@@ -35,7 +40,12 @@ Writes a plan, has `gate-plan-critic` check it against the real code, iterates a
 ```
 The full pipeline: frames the task (Goal / Context / Constraints / Done-when), splits it into areas, checks the plan, then runs Builder → Reviewer → Verifier until both signatures are in. If you already ran `/betterplan`, it skips the plan check.
 
-You do not have to use either. The `SessionStart` hook injects the doctrine into every session, so the rules apply even when you just talk to the agent normally.
+```
+/betterresearch does GLM-5.3 actually benefit from chain-of-thought on code tasks?
+```
+Frames the question, splits it into at most three axes, researches by **fetching pages rather than trusting search snippets**, has `gate-source-verifier` confront every claim with the source it names, then publishes a report and signs `SOURCES: VERIFIED` — which the citation gate checks.
+
+You do not have to use any of them. The `SessionStart` hook injects the doctrine into every session, so the rules apply even when you just talk to the agent normally.
 
 ## The routing, and why
 
@@ -45,6 +55,7 @@ You do not have to use either. The `SessionStart` hook injects the doctrine into
 | Builder | `glm-5.3` | max | fastest and most capable of the real lineup |
 | Reviewer | `glm-5.3` | high | **6.2% false-reject** against 21–26% for all the others (n=53) |
 | Verifier | `glm-5.3` | high | glm-4.7 was removed after EXP-6: **77.8% false-reject** on real multi-file patches, defect named only **11.8%** of the time |
+| Source Verifier | `glm-5.3` | high | the capability floor is not decorative: the same repair protocol scores **90.7%** with a frontier model and **79.3%** with a mid-size one, which its authors call "not yet on-par" |
 | ⛔ Forbidden for judging | `glm-5-turbo` | — | **3% false-OK**, the only model to have approved broken code |
 
 **Never route a role to `glm-5.2`, `glm-5.1`, `glm-5` or `glm-4.5-air`**: on the Coding Plan these are **aliases** answering as `glm-5.3` or `glm-4.7`. The "model diversity" would be fake. (Verified by reading the `model` field of the HTTP responses across 3 endpoints.)
@@ -59,6 +70,18 @@ The `Stop` hook blocks a conclusion that claims `VERDICT: PASS` when no **verifi
 - `VERDICT: FAIL` is never blocked, and the gate blocks at most once per turn
 
 Both refinements come from real sessions, not theory. The first version counted any command, so the agent's opening `ls` disarmed it for the whole session. The second matched the phrase `VERDICT: PASS` anywhere in the text, so it blocked an agent that was correctly *refusing* to sign. Both cases are now frozen as regression tests.
+
+## The citation gate
+
+The same `Stop` hook blocks a conclusion that signs `SOURCES: VERIFIED` while citing a page that was never fetched.
+
+- **A search is not a source.** A search returns a snippet selected to match your query, so a claim resting on one is a claim about the snippet. Only `WebFetch` counts; `WebSearch` is logged, never as proof of reading
+- **Signing over nothing is also blocked**: a marker with no citation at all would be the cheapest way to disarm the gate
+- The window is the **session**, not the turn — deliberately unlike the evidence gate. A verdict speaks about the current state of the code so its proof must be fresh; a paper fetched twenty minutes ago still says what it said
+- URLs are compared after normalisation, and arXiv `/abs/` and `/pdf/` are treated as one document — fetching the PDF and citing the abstract page is how anyone actually reads a paper
+- The marker is **optional** and the gate is silent without it. What gets refused is signing it without having opened the sources
+
+Why it exists: across 58,000 claim/source pairs, **50 to 90% of model citations are not fully supported** by the source they name, and the rate collapses further on open-ended questions (SourceCheckup, *Nature Communications* 2025). Nothing in the field guards against it.
 
 ## Changing the routing
 
@@ -87,12 +110,16 @@ betterzcode/
 │   ├── gate-plan-critic.md     glm-5.3 / max  — checks the plan before a line is written
 │   ├── gate-builder.md         glm-5.3 / max  — implements, never validates itself
 │   ├── gate-reviewer.md        glm-5.3 / high — commit-first, read-only, locked verdict
-│   └── gate-verifier.md        glm-5.3 / high — signs on execution evidence
+│   ├── gate-verifier.md        glm-5.3 / high — signs on execution evidence
+│   └── gate-source-verifier.md glm-5.3 / high — confronts each claim with its source
 ├── commands/
 │   ├── betterplan.md           plan, checked against the codebase, no code written
-│   └── betterswarm.md          full Plan Critic → Builder → Reviewer → Verifier run
-├── skills/evidence-gate/       the doctrine in 15 rules, each sourced
-├── hooks/                      doctrine injection + evidence log + the gate
+│   ├── betterswarm.md          full Plan Critic → Builder → Reviewer → Verifier run
+│   └── betterresearch.md       research whose citations were actually opened
+├── skills/
+│   ├── evidence-gate/          the code doctrine in 15 rules, each sourced
+│   └── source-gate/            the research doctrine in 12 rules, each sourced
+├── hooks/                      doctrine injection + evidence log + source log + both gates
 └── docs/                       routing.md + one sheet per model
 ```
 
@@ -102,12 +129,18 @@ betterzcode/
 .betterzcode/
 ├── evidence/
 │   └── <session id>.jsonl                    written by the HOOKS - proof
-└── plans/
-    └── 20260818-0020_login-page_91ab6d08/
-        ├── plan.md         the validated plan + what the critic caught
-        ├── report.md       run report: checkboxes, command, raw output, exit code
-        └── evidence.jsonl  frozen copy of the session log at close
+├── plans/
+│   └── 20260818-0020_login-page_91ab6d08/
+│       ├── plan.md         the validated plan + what the critic caught
+│       ├── report.md       run report: checkboxes, command, raw output, exit code
+│       └── evidence.jsonl  frozen copy of the session log at close
+└── research/
+    └── 20260819-1130_glm-cot-on-code_91ab6d08/
+        ├── report.md       answer, findings with verbatim quotes, stated gaps
+        └── evidence.jsonl  frozen copy, including every page fetched
 ```
+
+The evidence log carries both kinds of proof: `kind: "evidence"` for a command that ran, `kind: "source"` for a page that was fetched, and `kind: "search"` for a query — logged, but never counted as reading.
 
 **Two records, two levels of trust.** The hook log is written by the runtime and the model cannot touch it: that is proof. The report is written by the agent: it is readable and structured, but it is testimony. **The gate reads only the hook log.**
 
@@ -122,8 +155,8 @@ The log is anchored to the **project root**, not the current directory, so a pro
 ## Development
 
 ```bash
-node validate_zcode.mjs     # 14 structural checks against the ZCode spec
-node test_gate.mjs          # 22 integration tests of the gate
+node validate_zcode.mjs     # structural checks against the ZCode spec
+node test_gate.mjs          # 45 integration tests of both gates
 ```
 
 Both tools are dependency-free and require no build step. `test_gate.mjs` drives the hook over stdin/stdout, so it validates any implementation passed as an argument.
