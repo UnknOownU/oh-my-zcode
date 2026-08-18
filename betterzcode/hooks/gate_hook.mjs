@@ -10,8 +10,11 @@
  *
  *   session_start : injects the pipeline doctrine before the first model call.
  *   evidence      : logs the commands actually executed (PostToolUse/Bash).
- *   stop          : the evidence gate. Refuses a conclusion that claims PASS
- *                   without any verification command having run this turn.
+ *   sources       : logs the pages actually fetched (PostToolUse/WebFetch).
+ *   stop          : two gates. The evidence gate refuses a conclusion claiming
+ *                   PASS without any verification command having run this turn.
+ *                   The citation gate refuses a conclusion claiming SOURCES:
+ *                   VERIFIED while citing a URL that was never fetched.
  *
  * ZCode constraint: `async: true` prevents a hook from injecting context or
  * blocking. These three hooks are therefore synchronous (see hooks.json).
@@ -39,7 +42,11 @@ const DOCTRINE =
   "Every verdict ends with a final line, alone on its line: 'VERDICT: PASS' or " +
   "'VERDICT: FAIL'. " +
   "Never cap the output budget of a role that returns a verdict: a response cut " +
-  "off before its last line is the leading measured cause of unparseable verdicts.";
+  "off before its last line is the leading measured cause of unparseable verdicts. " +
+  "Research obeys the same law: a source is fetched and read, never inferred from a " +
+  "search snippet. A report whose citations you actually opened ends with a final " +
+  "line, alone on its line: 'SOURCES: VERIFIED'. Sign it and every URL you cited is " +
+  "checked against what was really fetched.";
 
 /**
  * A command only counts as PROOF if it VERIFIES something.
@@ -74,11 +81,91 @@ const VERIFY_RE = new RegExp(
 const PASS_LINE_RE = /^\s*\**\s*VERDICT\s*:?\s*PASS\s*\**\s*[.!]?\s*$/i;
 const FENCE_RE = /^\s*`{3,}\w*\s*$/;
 
-/** True only if the message ENDS with a PASS verdict line. */
-function claimsPass(message) {
+/**
+ * The citation marker: the research counterpart of the PASS verdict.
+ *
+ * Same last-line-only discipline, and for the same measured reason: the first
+ * evidence gate matched its phrase anywhere in the text and blocked an agent
+ * that was correctly REFUSING to sign. A gate that fires on a mention rather
+ * than on a signature punishes honesty.
+ */
+const SOURCES_LINE_RE = /^\s*\**\s*SOURCES\s*:?\s*VERIFIED\s*\**\s*[.!]?\s*$/i;
+
+/** Last meaningful line of a message, trailing fences stripped. Shared by both gates. */
+function lastLine(message) {
   const lines = String(message).trim().split(/\r?\n/).filter((l) => l.trim());
   while (lines.length && FENCE_RE.test(lines[lines.length - 1])) lines.pop();
-  return lines.length > 0 && PASS_LINE_RE.test(lines[lines.length - 1]);
+  return lines.length ? lines[lines.length - 1] : "";
+}
+
+/** True only if the message ENDS with a PASS verdict line. */
+const claimsPass = (message) => PASS_LINE_RE.test(lastLine(message));
+
+/** True only if the message ENDS with the citation marker. */
+const claimsSourcesVerified = (message) => SOURCES_LINE_RE.test(lastLine(message));
+
+/**
+ * `)` is excluded so that a markdown link `[title](https://x)` yields the URL
+ * and not the closing bracket. The trade is that a URL containing a real
+ * parenthesis is truncated; markdown links are far more common in agent output
+ * than parenthesised URLs, and a truncated URL fails closed (it will not match
+ * a fetch), which is the safe direction for a gate.
+ */
+const URL_RE = /https?:\/\/[^\s<>()[\]"'`]+/gi;
+
+/**
+ * Two URLs are the same source if they differ only by protocol, `www.`,
+ * a trailing slash or a fragment.
+ *
+ * arXiv is special-cased because it serves one paper at `/abs/X`, `/pdf/X`,
+ * `/pdf/X.pdf` and `/abs/Xv2`. Without this, fetching the PDF and citing the
+ * abstract page — the normal way anyone reads a paper — would be a false block.
+ */
+function normalizeUrl(u) {
+  let s = String(u).trim()
+    .replace(/[.,;:!?'"`*)\]]+$/, "")
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "");
+  s = s.split("#")[0].replace(/\/+$/, "").toLowerCase();
+  const arxiv = /^arxiv\.org\/(?:abs|pdf)\/(.+?)(?:v\d+)?(?:\.pdf)?$/.exec(s);
+  return arxiv ? `arxiv.org/abs/${arxiv[1]}` : s;
+}
+
+/** Every URL cited in the message, normalised and deduplicated. */
+function citedUrls(message) {
+  return [...new Set((String(message).match(URL_RE) ?? []).map(normalizeUrl))]
+    .filter(Boolean);
+}
+
+/**
+ * Pages actually FETCHED during this session.
+ *
+ * The window is the session, not the turn — deliberately unlike the evidence
+ * gate. A verdict speaks about the current state of the code, so its proof must
+ * be fresh; a paper fetched twenty minutes ago still says what it said. Scoping
+ * sources to the turn would force a re-fetch of every citation at write-up time.
+ */
+function fetchedThisSession(payload) {
+  const sid = payload.session_id ?? null;
+  const found = new Set();
+  let raw;
+  try {
+    raw = readFileSync(evidencePath(payload), "utf8");
+  } catch {
+    return found;
+  }
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    let e;
+    try {
+      e = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (sid !== null && e.session_id !== sid) continue;
+    if (e.kind === "source" && e.url) found.add(e.url);
+  }
+  return found;
 }
 
 async function readPayload() {
@@ -221,7 +308,80 @@ function onEvidence(payload) {
   // No output: a PostToolUse has nothing to inject here.
 }
 
-/** Evidence gate: a PASS signature requires a real VERIFICATION. */
+/**
+ * Traces a page retrieval: the raw material of the citation gate.
+ *
+ * A fetch counts as a source, a search does not, and that asymmetry IS the gate.
+ * A search returns a snippet selected to match the query, so a claim resting on
+ * one is a claim about the snippet rather than about the document. Measured at
+ * scale: across 58k claim/source pairs, 50-90% of model citations are not fully
+ * supported by the source they name, and the rate collapses further on
+ * open-ended questions (SourceCheckup, Nature Communications 2025).
+ *
+ * The input shape decides, not the tool name: a fetch carries a `url`, a search
+ * carries a `query`. That keeps the handler correct if the matcher is ever
+ * widened to another retrieval tool.
+ */
+function onSources(payload) {
+  const ti = payload.tool_input;
+  if (!ti || typeof ti !== "object") return;
+  const url = ti.url ?? ti.URL ?? "";
+  if (url) {
+    log(payload, {
+      kind: "source",
+      tool: payload.tool_name ?? null,
+      url: normalizeUrl(url),
+      raw_url: String(url).slice(0, 300),
+    });
+    return;
+  }
+  // Logged for the record, never as proof of reading.
+  if (ti.query) {
+    log(payload, {
+      kind: "search",
+      tool: payload.tool_name ?? null,
+      query: String(ti.query).slice(0, 200),
+    });
+  }
+}
+
+const EVIDENCE_BLOCK =
+  "Evidence gate: this turn claims VERDICT: PASS while no VERIFICATION " +
+  "command was executed during this turn. Listing files or reading code is " +
+  "not proof: only a command that verifies counts (test suite, linter, type " +
+  "checker, build). " +
+  "Actually run one, quote its raw output and its exit code, then conclude. " +
+  "If a subagent already verified this, run the deciding command yourself: " +
+  "its commands are not traceable from this session, so they cannot back " +
+  "your signature. " +
+  "If verification is impossible here, the verdict is FAIL with the reason, " +
+  "never PASS by default.";
+
+function citationBlock(missing) {
+  const head = missing.length
+    ? `${missing.length} cited source(s) were never fetched in this session: ` +
+      `${missing.slice(0, 8).join(", ")}. `
+    : "the report cites no source at all, so the signature answers for nothing. ";
+  return (
+    `Citation gate: this turn signs SOURCES: VERIFIED but ${head}` +
+    "A search result is not a source: a search returns a snippet selected to " +
+    "match your query, so a claim resting on one is a claim about the snippet, " +
+    "not about the document. Open each URL with WebFetch and read it, then cite " +
+    "the exact URL you fetched. " +
+    "If a source cannot be fetched, keep the claim only if you mark it " +
+    "explicitly unverified, and drop the signature. The marker is optional; " +
+    "signing it without having opened the sources is not."
+  );
+}
+
+/**
+ * The two gates. A signature is admissible only if the runtime saw what backs it.
+ *
+ * Evidence is evaluated first because it is the stricter claim, and only one
+ * block can be emitted per turn. Both are still evaluated when a message carries
+ * both signatures: a research report can conclude on code as well as on sources,
+ * and each marker answers for its own claim.
+ */
 function onStop(payload) {
   // Already intervened this turn: let it through (ZCode caps at 3 retries).
   if (payload.stop_hook_active) {
@@ -229,37 +389,46 @@ function onStop(payload) {
     return;
   }
 
-  if (!claimsPass(payload.last_assistant_message ?? "")) {
-    log(payload, { kind: "turn_end" });
-    return;
+  const message = String(payload.last_assistant_message ?? "");
+  const closing = { kind: "turn_end" };
+
+  if (claimsPass(message)) {
+    const proofs = verificationsThisTurn(payload);
+    if (!proofs.length) {
+      log(payload, { kind: "gate_block", reason: "PASS without verification command" });
+      emit({ decision: "block", reason: EVIDENCE_BLOCK });
+      return;
+    }
+    closing.verified_by = proofs.slice(0, 5);
   }
 
-  const proofs = verificationsThisTurn(payload);
-  if (proofs.length) {
-    log(payload, { kind: "turn_end", verified_by: proofs.slice(0, 5) });
-    return;
+  if (claimsSourcesVerified(message)) {
+    const cited = citedUrls(message);
+    const fetched = fetchedThisSession(payload);
+    const missing = cited.filter((u) => !fetched.has(u));
+    // No citation at all is also a block: a signature over an empty set is
+    // vacuous, and would be the cheapest way to disarm this gate.
+    if (!cited.length || missing.length) {
+      log(payload, {
+        kind: "gate_block",
+        reason: cited.length
+          ? "SOURCES: VERIFIED with unfetched citations"
+          : "SOURCES: VERIFIED with no citation",
+        missing: missing.slice(0, 10),
+      });
+      emit({ decision: "block", reason: citationBlock(missing) });
+      return;
+    }
+    closing.sourced_by = cited.slice(0, 10);
   }
 
-  log(payload, { kind: "gate_block", reason: "PASS without verification command" });
-  emit({
-    decision: "block",
-    reason:
-      "Evidence gate: this turn claims VERDICT: PASS while no VERIFICATION " +
-      "command was executed during this turn. Listing files or reading code is " +
-      "not proof: only a command that verifies counts (test suite, linter, type " +
-      "checker, build). " +
-      "Actually run one, quote its raw output and its exit code, then conclude. " +
-      "If a subagent already verified this, run the deciding command yourself: " +
-      "its commands are not traceable from this session, so they cannot back " +
-      "your signature. " +
-      "If verification is impossible here, the verdict is FAIL with the reason, " +
-      "never PASS by default.",
-  });
+  log(payload, closing);
 }
 
 const HANDLERS = {
   session_start: onSessionStart,
   evidence: onEvidence,
+  sources: onSources,
   stop: onStop,
 };
 

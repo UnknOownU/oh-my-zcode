@@ -1,5 +1,5 @@
 {
-  "description": "Evidence-gated pipeline: injects the doctrine at session start, logs executed proof, and locks the conclusion until proof exists.",
+  "description": "Evidence-gated pipeline: injects the doctrine at session start, logs executed proof and fetched sources, and locks the conclusion until proof exists.",
   "hooks": {
     "SessionStart": [
       {
@@ -27,6 +27,20 @@
             "args": [
               "${ZCODE_PLUGIN_ROOT}/hooks/gate_hook.mjs",
               "evidence"
+            ],
+            "timeoutMs": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "WebFetch|WebSearch",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "node",
+            "args": [
+              "${ZCODE_PLUGIN_ROOT}/hooks/gate_hook.mjs",
+              "sources"
             ],
             "timeoutMs": 5000
           }
