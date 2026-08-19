@@ -37,7 +37,7 @@ Type `/better` in the input box to see the three commands.
 ```
 /betterplan  add a login page, sessions must survive a refresh
 ```
-Writes a plan, has `gate-plan-critic` check it against the real code, iterates at most three times, and hands you a validated plan. **Writes no code.**
+Builds a scaffold of the real code and has `gate-scaffold-critic` verify it, writes the plan on top — persisted to disk **before** critique, the critic refuses a plan that has no file — and has `gate-plan-critic` check it. Hands you a validated plan. **Writes no code.**
 
 ```
 /betterswarm fix the orders API pagination, it skips the last page
@@ -65,7 +65,7 @@ You do not have to use any of them. The `SessionStart` hook injects the doctrine
 
 | Role | Model | Effort | Evidence |
 |---|---|---|---|
-| Plan Critic | `glm-5.3` | max | the plan is the ceiling: **48.1% → 74.4%** Pass@1 from plan quality alone. `max` is affordable here because a plan is short text |
+| Plan Critic | `glm-5.3` | max | the plan is the ceiling: **48.1% → 60.3% → 74.4%** Pass@1 — direct / generated plan / ground-truth plan, HumanEval code-davinci-002. `max` is affordable here because a plan is short text |
 | Builder | `glm-5.3` | max | fastest and most capable of the real lineup |
 | Reviewer | `glm-5.3` | high | **6.2% false-reject** against 21–26% for all the others (n=53) |
 | Verifier | `glm-5.3` | high | glm-4.7 was removed after EXP-6: **77.8% false-reject** on real multi-file patches, defect named only **11.8%** of the time |
@@ -151,6 +151,7 @@ betterzcode/
 ├── .zcode-plugin/plugin.json   manifest
 ├── agents/
 │   ├── gate-plan-critic.md     glm-5.3 / max  — checks the plan before a line is written
+│   ├── gate-scaffold-critic.md glm-5.3 / max  — checks the recon scaffold before the plan exists
 │   ├── gate-builder.md         glm-5.3 / max  — implements, never validates itself
 │   ├── gate-reviewer.md        glm-5.3 / high — commit-first, read-only, locked verdict
 │   ├── gate-verifier.md        glm-5.3 / high — signs on execution evidence
@@ -178,6 +179,7 @@ betterzcode/
 │   └── <session id>.jsonl                    written by the HOOKS - proof
 ├── plans/
 │   └── 20260818-0020_login-page_91ab6d08/
+│       ├── scaffold.md     the verified recon: files, symbols, existing patterns
 │       ├── plan.md         the validated plan + what the critic caught
 │       ├── report.md       run report: checkboxes, command, raw output, exit code
 │       └── evidence.jsonl  frozen copy of the session log at close
