@@ -73,7 +73,7 @@ description: Doctrine of the Plan-Critic -> Builder -> Reviewer -> Verifier pipe
 ## GLM-specific traps, measured
 
 - **`glm-5.3` cannot disable its reasoning.** `thinking.type: disabled` raises an error. Use `reasoning_effort: low`.
-- **A `max_tokens` that is too low produces an EMPTY response**: the reasoning consumes the budget. Floor of 1500 for any call carrying a verdict.
+- **A `max_tokens` that is too low produces an EMPTY response**: the reasoning consumes the budget. **Set `131072`, the documented ceiling, and never below** — the ceiling is free, since you pay for tokens generated, not for the limit allowed.
 - **`glm-5.3` misses its verdict format in 7.5 to 10.4% of cases.** Require the verdict alone on the last line.
 - **The 4.x family is verbose**: ~4500 output tokens for a 290-token prompt. This is the pipeline's leading cost driver.
 - **Never write tool-call syntax in plain text inside a system prompt** on the coding endpoint: the application firewall returns a spurious 429.
