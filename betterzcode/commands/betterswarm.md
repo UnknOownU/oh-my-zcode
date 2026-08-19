@@ -28,7 +28,7 @@ Once the areas are defined, you have a plan. Do not execute it yet.
 
 Otherwise delegate to `gate-plan-critic`. Pass it the four parts and the planned steps. It checks against the codebase: do the referenced files exist, is the step order workable, is a precondition missing, is the success criterion testable, was anything dropped.
 
-If it returns `PLAN REVISE`: fix the plan with its concrete fixes, then send it back. **Three rounds maximum** (96.5% of plans converge in 3 or fewer); after that, surface the remaining problems to the user and let them decide.
+If it returns `PLAN REVISE`: fix the plan with its concrete fixes, then send it back. **Three rounds maximum** — the budget ceiling and the escalation point, not a target (the 96.5%-by-3 figure comes from embodied-AI plans, arXiv 2509.02761; no measured constant exists for code planning); after that, surface the remaining problems to the user and let them decide.
 
 If it returns `PLAN READY`: proceed to step 1.
 
@@ -63,7 +63,14 @@ If the verdict is FAIL: back to step 1 with the evidence of failure.
 
 ## Step 4: Loop and close
 
-Repeat Builder -> Reviewer -> Verifier until both signatures are in. Then move to the next wave.
+Repeat Builder -> Reviewer -> Verifier until both signatures are in, with two limits:
+
+- **Adaptive stop.** The loop ends at the FIRST full pass — both signatures in. Never burn budget on an area that already passed.
+- **Hard ceiling.** Three full Builder -> Reviewer -> Verifier cycles per area maximum. The cap of 3 is the budget ceiling and the escalation point, not a target. When three cycles are exhausted without both signatures: STOP the area, keep the blocking evidence (the Reviewer's findings or the Verifier's failure outputs), report it in the run report, and let the user decide.
+
+Then move to the next wave.
+
+Retries past the first cycle are cheap only in appearance: each full cycle here costs three complete agents, while measured gains saturate early — retrying helps only when a verifier sorts the attempts, and this loop is already gate-sorted (budget 1 -> 8 rollouts lifted 37.60% -> 46.00%, with execution-only selection dropping at budget 8, arXiv 2503.23803); adding LLM calls is non-monotonic, improving easy queries and degrading hard ones (arXiv 2403.02419). The ceiling must therefore sit far below raw sampling budgets.
 
 **Before you sign anything, run the deciding command yourself.** A subagent's commands are not traceable from this session, so the Verifier's sixteen proofs cannot back your signature: only what runs here can. Run the one command that settles it, quote its raw output and its exit code, then conclude.
 
@@ -87,6 +94,8 @@ At the **project root**, in `.betterzcode/plans/<YYYYMMDD-HHMM>_<slug>_<session8
 | Area | Iterations | Reviewer | Verifier |
 |---|---|---|---|
 | ... | 2 | PASS | PASS |
+
+The **Iterations** column carries the honest attempt count: a task resolved on attempt N is reported as N, never presented as first-try. An area stopped at the ceiling of 3 cycles without both signatures is reported as 3 with the blocking evidence.
 
 ## Signed here, in this session
 - `<the deciding command you ran yourself>` - exit <code>
