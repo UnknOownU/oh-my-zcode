@@ -72,7 +72,7 @@ It does not survive real code. On **SWE-bench Verified** (real repositories, mul
 
 It rejects almost everything. Its 89% "detection" on amputated patches is therefore not skill: systematically rejecting mechanically catches all the broken ones. The independent judge settles it: it names the actually missing piece only **11.8%** of the time, so it rejects for the wrong reasons. In production it would block 4 valid fixes out of 5.
 
-`glm-5.3` is retained **by elimination**, with `high`: the only level measured at 0% false-OK AND 0% false-reject (45 tasks, unconstrained budget). `max` is ruled out because on real patches it exceeds 240 s in 72% of calls and costs 28.67 points per review. `low` and `minimal` are forbidden: 4.2 to 8.3% measured false-OK.
+`glm-5.3` is retained **by elimination**, with `high`: the only level measured at 0% false-OK AND 0% false-reject (45 tasks, unconstrained budget). `max` is ruled out on cost: a review at `max` measures 28.67 points per review (an earlier latency-based exclusion was retired in 1.9.2 — the original timing measurement was invalid; re-measurement is tracked on the roadmap). `low` and `minimal` are forbidden: 4.2 to 8.3% measured false-OK.
 
 **Lesson for any future change to this plugin**: a ranking established on isolated functions can invert on real code. Never re-route this role on the strength of a micro-benchmark alone.
 

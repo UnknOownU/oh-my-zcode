@@ -132,7 +132,7 @@ Two independent methodologies, same conclusion → **firm exclusion from the Rev
 
 | Role | Effort | Reason |
 |---|---|---|
-| **Reviewer / QA** (carry a verdict) | **`high`** | at an unthrottled budget, `high` and `max` tie (97.8%, 0% false-OK); **EXP-6 breaks the tie on real code**: `max` there expires in 72% of cases and costs 28.67 points/review |
+| **Reviewer / QA** (carry a verdict) | **`high`** | at an unthrottled budget, `high` and `max` tie (97.8%, 0% false-OK); **EXP-6 breaks the tie on real code**: `max` there costs 28.67 points/review (its latency is under re-measurement) |
 | **Worker** (produces code) | **`max`** | the format problem does not concern it: it returns code, not a verdict |
 | **Triage / fast recon** | `low` | 4.7× cheaper, 3.3× faster — **forbidden to sign** |
 
@@ -204,13 +204,13 @@ The previous sections all rest on **isolated functions** (HumanEvalFix, QuixBugs
 
 3. **This gap was announced by the public benchmarks** — which our isolated-function measurements contradicted: Terminal-Bench 41% (4.7) vs 56.2% (5.3), SWE-bench Verified 73.8% vs 77.8% **[PUBLISHED]**. **On realistic tasks, the public benchmarks were right and our micro-bench was wrong.**
 
-4. **glm-5.3 @max is operationally impractical on this format**: **72% of its calls exceed 240 s** (measured latency 66 s / 165 s / 236 s) and it costs **28.67 points per review**, i.e. 17× glm-4.7. Its metrics above rest on n=10 and **are not conclusive** — they are shown for transparency, not as proof.
+4. **glm-5.3 @max is operationally impractical on this format**: it costs **28.67 points per review**, i.e. 17× glm-4.7. (A latency-based exclusion was retired in 1.9.2 — the timing measurement was invalid; re-measurement pending.) Its metrics above rest on n=10 and **are not conclusive** — they are shown for transparency, not as proof.
 
 ### Decision
 
 - **glm-4.7 is removed from any role carrying a verdict on multi-file code.**
-- **QA moves to `glm-5.3` @high** — the only effort measured at 0% false-OK *and* 0% false-reject (EXP-4, n=45), and a tenable latency/cost trade-off against the `max` that expires.
-- **Plan for a timeout of at least 900 s** on the client side for any verdict on a realistic patch: 240 s is insufficient (measured).
+- **QA moves to `glm-5.3` @high** — the only effort measured at 0% false-OK *and* 0% false-reject (EXP-4, n=45), and a tenable latency/cost trade-off against the more expensive `max`.
+- **Plan for a timeout of at least 900 s** on the client side for any verdict on a realistic patch: a shorter timeout risks cutting off long reviews.
 
 ### Honest caveat
 
