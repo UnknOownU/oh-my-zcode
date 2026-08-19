@@ -1,7 +1,7 @@
 {
   "name": "betterzcode",
-  "version": "1.7.0",
-  "description": "Your agent cannot call a task done without proving it, and cannot cite a source it never opened. Separate agents check the plan, write the code, review it and verify it by execution; hooks block any success verdict no executed test supports, any report citing a page that was never fetched, and in security runs a finding enters the report only once independently reproduced — the hooks block a FINDINGS: VERIFIED signature when no verification command ran. An agent that writes is never an agent that judges.",
+  "version": "1.8.0",
+  "description": "Your agent cannot call a task done without proving it, and cannot cite a source it never opened. Separate agents check the plan, write the code, review it and verify it by execution; hooks block any success verdict no executed test supports, any report citing a page that was never fetched, and in security runs a finding enters the report only once independently reproduced — the hooks block a FINDINGS: VERIFIED signature when no verification command ran, and a red-team impact mode whose attack commands a PreToolUse gate physically blocks until a test/dev scope is authorized. An agent that writes is never an agent that judges.",
   "author": {
     "name": "UnknOownU",
     "url": "https://github.com/UnknOownU"
@@ -18,7 +18,9 @@
     "research",
     "citations",
     "security",
-    "pentest"
+    "pentest",
+    "red-team",
+    "impact"
   ],
   "agents": "agents",
   "commands": "commands",
