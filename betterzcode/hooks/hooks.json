@@ -61,6 +61,20 @@
             "timeoutMs": 5000
           }
         ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "node",
+            "args": [
+              "${ZCODE_PLUGIN_ROOT}/hooks/gate_hook.mjs",
+              "dispatch"
+            ],
+            "timeoutMs": 5000
+          }
+        ]
       }
     ],
     "Stop": [

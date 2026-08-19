@@ -6,7 +6,7 @@
  * code and JSON on stdout. Anything that is not a protocol result must go to
  * stderr, otherwise the response is corrupted.
  *
- * Five roles, selected by argv[2]:
+ * Six roles, selected by argv[2] — five gates (the stop handler holds three):
  *
  *   session_start : injects the pipeline doctrine before the first model call.
  *   evidence      : logs the commands actually executed (PostToolUse/Bash).
@@ -15,6 +15,11 @@
  *                   unless a valid authorization (active_scope.json, env
  *                   dev/staging/test, matching session) exists, and confines
  *                   every URL a scoped session touches to the declared targets.
+ *   dispatch      : the dispatch gate (PreToolUse/Agent|Task). A tagged
+ *                   red-team subagent dispatch ([betterredteam <run-id>]) is
+ *                   admissible only under a valid armed scope; every other
+ *                   dispatch is never touched (zero interference by
+ *                   construction — detection is by routing tag, not language).
  *   stop          : three gates. The evidence gate refuses a conclusion claiming
  *                   PASS without any verification command having run this turn.
  *                   The citation gate refuses a conclusion claiming SOURCES:
@@ -255,24 +260,43 @@ function samePath(a, b) {
  * Measured in a real run (2026-08-17): agents worked from a subfolder, so the
  * evidence split across three separate files and the gate read the wrong one.
  * A proof written one directory down was invisible from the root.
+ *
+ * Field incident (2026-08-19, run 20260819-2107, session 63232fdd): the agent
+ * worked from lms-booster/, which has its own package.json, so the walk stopped
+ * one floor BELOW the real root — the scope gate read .betterzcode at the wrong
+ * level, fail-closed on a validly armed scope, and the evidence split across
+ * two roots. The walk therefore NO LONGER early-returns at the first directory
+ * carrying ANY marker: it walks to the hop cap / filesystem root as before,
+ * REMEMBERS the first (nearest) directory carrying .betterzcode, and returns
+ * that; only when no .betterzcode ancestor exists does it fall back to the
+ * previous first-any-marker result. Nearest .betterzcode wins (most-specific
+ * workspace when both levels carry one).
+ *
+ * WARNING: reordering the markers array does NOT fix this — the walk must pass
+ * OVER nearer markers to find the .betterzcode ancestor.
  */
 function projectRoot(payload) {
   const start = payload.cwd || process.cwd();
   const home = homedir();
   const markers = [".betterzcode", ".git", "package.json", "pyproject.toml", "go.mod", "Cargo.toml"];
   let dir = start;
+  let bzRoot = null; // nearest ancestor carrying .betterzcode
+  let markerRoot = null; // nearest ancestor carrying any marker (legacy fallback)
   for (let hops = 0; hops < 12; hops += 1) {
     // Never anchor at the user's home: a stray .betterzcode there would
     // capture the evidence of every project on the machine.
     if (samePath(dir, home)) break;
-    for (const m of markers) {
-      if (existsSync(join(dir, m))) return dir;
+    if (existsSync(join(dir, ".betterzcode")) && bzRoot === null) bzRoot = dir;
+    if (markerRoot === null) {
+      for (const m of markers) {
+        if (existsSync(join(dir, m))) { markerRoot = dir; break; }
+      }
     }
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
-  return start;
+  return bzRoot ?? markerRoot ?? start;
 }
 
 /** One log per session, addressable from the session id alone. */
@@ -759,11 +783,87 @@ function onScope(payload) {
   //    silently — logging every innocent command would bury the audit trail.
 }
 
+/**
+ * The dispatch gate (PreToolUse/Agent|Task), fifth mechanical gate.
+ *
+ * Hooks do not fire inside subagents (measured in a real run: 16 invisible
+ * Verifier commands), so a dispatched beast's own commands never reach the Bash
+ * scope gate — but the dispatch itself is a main-session tool call, and this
+ * gate stands there: a TAGGED dispatch is admissible only under a valid armed
+ * scope, and while one is armed, every URL host in the prompt must land inside
+ * the declared targets. Untagged dispatches are NEVER touched, whatever their
+ * text — zero interference by construction.
+ */
+// Detection is by routing tag, not language: any intent regex matches pipeline
+// prompts that quote plan/fixture text, and the gate would have blocked its own
+// construction (plan-critic round 1, 2026-08-19). The tag is the only trigger.
+const DISPATCH_TAG_RE = /\[betterredteam[^\]]*\]/i;
+
+function dispatchBlock(payload, reason, prompt) {
+  log(payload, { kind: "dispatch_block", reason, prompt: String(prompt).slice(0, 200) });
+  emit({ decision: "block", reason: `Dispatch gate: ${reason}\n${SCOPE_POINTER}` });
+}
+
+function onDispatch(payload) {
+  const ti = payload.tool_input;
+  const prompt = ti && typeof ti === "object"
+    ? String(ti.prompt ?? ti.description ?? "")
+    : "";
+  // Untagged: a normal dispatch (builder, reviewer, researcher — even one
+  // quoting attack tool names verbatim). Never touched, never logged.
+  if (!DISPATCH_TAG_RE.test(prompt)) return;
+  const head = prompt.slice(0, 200);
+
+  // 1. No session id: an untraceable caller must not get the gun. Fail closed.
+  if (!payload.session_id) {
+    dispatchBlock(payload,
+      "tagged dispatch from a caller with no session id (untraceable caller, fails closed)",
+      head);
+    return;
+  }
+
+  // 2. A tagged dispatch requires a valid scope: parsable file, non-prod env,
+  //    session match. Any failure blocks, cause-specific (onScope in spirit).
+  const scope = readScopeFile(payload);
+  const valid = scope !== null
+    && Array.isArray(scope.targets)
+    && scope.targets.length
+    && typeof scope.env === "string" && scope.env !== "prod"
+    && scope.session_id === payload.session_id;
+  if (!valid) {
+    dispatchBlock(payload, scope === null
+      ? existsSync(scopeFilePath(payload))
+        ? "active_scope.json is present but malformed (unparsable JSON)"
+        : "no active_scope.json — no scope file for this session"
+      : !Array.isArray(scope.targets) || !scope.targets.length
+        ? "scope file invalid: targets is missing or empty"
+        : !(typeof scope.env === "string" && scope.env !== "prod")
+          ? `scope env invalid (got ${JSON.stringify(scope.env)})`
+          : `scope belongs to another session (scope session_id=${JSON.stringify(scope.session_id)}, this session=${JSON.stringify(payload.session_id)})`,
+      head);
+    return;
+  }
+
+  // 3. Valid scope armed: every URL host in the prompt must land inside the
+  //    declared targets — same extraction and comparison as the Bash gate.
+  for (const h of commandHosts(prompt)) {
+    if (!scope.targets.some((t) => hostMatchesTarget(h, t))) {
+      dispatchBlock(payload, `host not in scope targets: ${h}`, head);
+      return;
+    }
+  }
+
+  // 4. Allowed — but nothing is emitted: the tag reaches the beast unchanged
+  //    (no rewriting), and the pass is recorded for the audit trail.
+  log(payload, { kind: "dispatch_pass", prompt: head });
+}
+
 const HANDLERS = {
   session_start: onSessionStart,
   evidence: onEvidence,
   sources: onSources,
   scope: onScope,
+  dispatch: onDispatch,
   stop: onStop,
 };
 
