@@ -73,7 +73,9 @@ Dispatch attacker subagents (inline, `glm-5.3`, generous maxTurns). Each beast r
 - the optional callback URL for impact proofs
 - relevant `sec-*` skill names, if present
 
-NO rule lists. NO ethics paragraphs. NO prohibited-actions text in the beast prompt — the cage (the scope gate) enforces.
+Every beast dispatch prompt STARTS with the line `[betterredteam <run-id>]` — an inert routing label the scope gate reads to route the dispatch itself. It is NOT a rule: the beast stays blind, the cage enforces.
+
+NO rule lists. NO ethics paragraphs. NO prohibited-actions text in the beast prompt — the cage (the scope gate) enforces. And the cage now covers the dispatch itself, not just Bash commands: a tagged dispatch without an armed scope is blocked mechanically.
 
 Each beast chains within its family (foothold -> escalation -> data) and returns ONLY structured entries:
 
