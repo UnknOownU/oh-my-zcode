@@ -5,12 +5,13 @@
 
 ## What it is
 
-Five isolated ZCode subagents, three orchestration commands, two doctrine skills, and hooks that turn the doctrine into something the runtime actually enforces. Every design decision is backed either by a measurement made on a GLM Coding Plan account or by a cited paper.
+Six isolated ZCode subagents, four orchestration commands, three doctrine skills, and hooks that turn the doctrine into something the runtime actually enforces. Every design decision is backed either by a measurement made on a GLM Coding Plan account or by a cited paper.
 
-**The part nothing else does** — two gates that block instead of asking nicely:
+**The part nothing else does** — three gates that block instead of asking nicely:
 
 - a `Stop` hook refuses to let a turn end on `VERDICT: PASS` when no verification command ran during that turn;
-- the same hook refuses `SOURCES: VERIFIED` when the turn cites a page that was never fetched.
+- the same hook refuses `SOURCES: VERIFIED` when the turn cites a page that was never fetched;
+- and, for security runs, the same hook refuses `FINDINGS: VERIFIED` when no verification command ran during the turn — a finding that was not reproduced does not exist.
 
 The second one appears to be unique. Read at source level, no production research harness — LangChain's `open_deep_research`, GPT-Researcher, STORM, smolagents, `deep-research` — verifies that a cited source supports the claim. They state citation rules in a prompt and check none of them.
 
@@ -45,6 +46,11 @@ The full pipeline: frames the task (Goal / Context / Constraints / Done-when), s
 ```
 Frames the question, splits it into at most three axes, researches by **fetching pages rather than trusting search snippets**, has `gate-source-verifier` confront every claim with the source it names, then publishes a report and signs `SOURCES: VERIFIED` — which the citation gate checks.
 
+```
+/bettersecurity https://our-staging.example.com — full check, we own the staging box
+```
+Locks the scope in writing before anything is touched, has the plan checked against the doctrine, runs recon then the attackers, and finally an independent `gate-finding-verifier` **re-executes** every candidate finding instead of re-reasoning about it. Only reproduced findings enter the report, which then signs `FINDINGS: VERIFIED` — and the findings gate checks that the signature is backed by a verification command that actually ran this turn.
+
 You do not have to use any of them. The `SessionStart` hook injects the doctrine into every session, so the rules apply even when you just talk to the agent normally.
 
 ## The routing, and why
@@ -56,6 +62,7 @@ You do not have to use any of them. The `SessionStart` hook injects the doctrine
 | Reviewer | `glm-5.3` | high | **6.2% false-reject** against 21–26% for all the others (n=53) |
 | Verifier | `glm-5.3` | high | glm-4.7 was removed after EXP-6: **77.8% false-reject** on real multi-file patches, defect named only **11.8%** of the time |
 | Source Verifier | `glm-5.3` | high | the capability floor is not decorative: the same repair protocol scores **90.7%** with a frontier model and **79.3%** with a mid-size one, which its authors call "not yet on-par" |
+| Finding Verifier | `glm-5.3` | max | independent reproduction: adversarial verification eliminated 49.5% of candidate findings (OpenAnt); re-execution not re-reasoning, because verification that only re-reasons suppresses 22.25% of true positives (Sifting the Noise) |
 | ⛔ Forbidden for judging | `glm-5-turbo` | — | **3% false-OK**, the only model to have approved broken code |
 
 **Never route a role to `glm-5.2`, `glm-5.1`, `glm-5` or `glm-4.5-air`**: on the Coding Plan these are **aliases** answering as `glm-5.3` or `glm-4.7`. The "model diversity" would be fake. (Verified by reading the `model` field of the HTTP responses across 3 endpoints.)
@@ -89,6 +96,17 @@ Why it exists: across 58,000 claim/source pairs, **50 to 90% of model citations 
 
 **The anti-loop no longer goes blind.** ZCode caps retries, so the gate never blocks twice in a turn. It used to stop evaluating entirely on the retry, which made a bypassed gate indistinguishable from a satisfied one in the log. It now still evaluates and records `gate_bypassed` — it just does not act on it.
 
+## The findings gate
+
+The same `Stop` hook also blocks a conclusion that signs `FINDINGS: VERIFIED` when no **verification** command ran during the turn. A security run ends with findings or with silence — never with claims nobody reproduced.
+
+- **A finding that was not reproduced does not exist.** Scanners and attackers produce candidates; only the independent verifier's re-execution turns a candidate into a finding
+- **Security tools count as verification** for this gate: `nuclei`, `semgrep`, `sqlmap`, `nmap` and friends are verification commands, unlike the evidence gate where only test suites, linters, type checkers and builds count
+- Proof must be **fresh**: a scanner run last turn does not sign this turn's findings
+- The marker is **optional** and the gate is silent without it — what gets refused is signing it without having run verification
+
+Why it exists: in the OpenAnt adversarial-verification study, independent reproduction eliminated **49.5% of candidate findings**. And verification must be re-execution, not re-reasoning: a verifier that only re-reasons suppressed **22.25% of true positives** in Sifting the Noise, dropping its true-positive rate from 23.0 to 6.3.
+
 ## Changing the routing
 
 Each role's model and thinking level live in one place: the agent's frontmatter, in `agents/*.md`.
@@ -117,14 +135,17 @@ betterzcode/
 │   ├── gate-builder.md         glm-5.3 / max  — implements, never validates itself
 │   ├── gate-reviewer.md        glm-5.3 / high — commit-first, read-only, locked verdict
 │   ├── gate-verifier.md        glm-5.3 / high — signs on execution evidence
-│   └── gate-source-verifier.md glm-5.3 / high — confronts each claim with its source
+│   ├── gate-source-verifier.md glm-5.3 / high — confronts each claim with its source
+│   └── gate-finding-verifier.md glm-5.3 / max — re-executes security findings, never re-reasons
 ├── commands/
 │   ├── betterplan.md           plan, checked against the codebase, no code written
 │   ├── betterswarm.md          full Plan Critic → Builder → Reviewer → Verifier run
-│   └── betterresearch.md       research whose citations were actually opened
+│   ├── betterresearch.md       research whose citations were actually opened
+│   └── bettersecurity.md       scoped security run with independent finding verification
 ├── skills/
 │   ├── evidence-gate/          the code doctrine in 15 rules, each sourced
-│   └── source-gate/            the research doctrine in 12 rules, each sourced
+│   ├── source-gate/            the research doctrine in 12 rules, each sourced
+│   └── security-gate/          the security doctrine, each rule sourced
 ├── hooks/                      doctrine injection + evidence log + source log + both gates
 └── docs/                       routing.md + one sheet per model
 ```
@@ -144,6 +165,12 @@ betterzcode/
     └── 20260819-1130_glm-cot-on-code_91ab6d08/
         ├── report.md       answer, findings with verbatim quotes, stated gaps
         └── evidence.jsonl  frozen copy, including every page fetched
+└── security/
+    └── 20260819-1400_staging-check_91ab6d08/
+        ├── scope.json      the written scope lock, before anything was touched
+        ├── surface.md      the enumerated attack surface after recon
+        ├── report.md       only reproduced findings, each with its re-execution proof
+        └── evidence.jsonl  frozen copy, including every verification command
 ```
 
 The evidence log carries both kinds of proof: `kind: "evidence"` for a command that ran, `kind: "source"` for a page that was fetched, and `kind: "search"` for a query — logged, but never counted as reading.
@@ -162,7 +189,7 @@ The log is anchored to the **project root**, not the current directory, so a pro
 
 ```bash
 node validate_zcode.mjs     # structural checks against the ZCode spec
-node test_gate.mjs          # 56 integration tests of both gates
+node test_gate.mjs          # 70 integration tests of all three gates
 ```
 
 Both tools are dependency-free and require no build step. `test_gate.mjs` drives the hook over stdin/stdout, so it validates any implementation passed as an argument.
