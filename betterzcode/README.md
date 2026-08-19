@@ -5,13 +5,16 @@
 
 ## What it is
 
-Six isolated ZCode subagents, four orchestration commands, three doctrine skills, and hooks that turn the doctrine into something the runtime actually enforces. Every design decision is backed either by a measurement made on a GLM Coding Plan account or by a cited paper.
+Six isolated ZCode subagents, five orchestration commands, three doctrine skills, and hooks that turn the doctrine into something the runtime actually enforces. Every design decision is backed either by a measurement made on a GLM Coding Plan account or by a cited paper.
 
-**The part nothing else does** — three gates that block instead of asking nicely:
+The fifth command, `/betterredteam`, is authorized impact assessment: it answers what an attacker actually takes — not whether a door is closed.
+
+**The part nothing else does** — four gates that block instead of asking nicely:
 
 - a `Stop` hook refuses to let a turn end on `VERDICT: PASS` when no verification command ran during that turn;
 - the same hook refuses `SOURCES: VERIFIED` when the turn cites a page that was never fetched;
-- and, for security runs, the same hook refuses `FINDINGS: VERIFIED` when no verification command ran during the turn — a finding that was not reproduced does not exist.
+- and, for security runs, the same hook refuses `FINDINGS: VERIFIED` when no verification command ran during the turn — a finding that was not reproduced does not exist;
+- the fourth gate blocks the action instead of the conclusion: a `PreToolUse` hook refuses the attack command itself unless a test/dev scope has been authorized.
 
 The second one appears to be unique. Read at source level, no production research harness — LangChain's `open_deep_research`, GPT-Researcher, STORM, smolagents, `deep-research` — verifies that a cited source supports the claim. They state citation rules in a prompt and check none of them.
 
@@ -50,6 +53,11 @@ Frames the question, splits it into at most three axes, researches by **fetching
 /bettersecurity https://our-staging.example.com — full check, we own the staging box
 ```
 Locks the scope in writing before anything is touched, has the plan checked against the doctrine, runs recon then the attackers, and finally an independent `gate-finding-verifier` **re-executes** every candidate finding instead of re-reasoning about it. Only reproduced findings enter the report, which then signs `FINDINGS: VERIFIED` — and the findings gate checks that the signature is backed by a verification command that actually ran this turn.
+
+```
+/betterredteam https://staging.ourapp.io — full chain, we own staging
+```
+The environment gate comes first: test/dev or nothing — the run does not start outside an authorized scope. Beasts then chain foothold → escalation → data with every constraint enforced externally by the scope gate, not by their own restraint. Impact is proven by sample or by controlled callback, and the run ends with a detection report per attack family plus cleanup re-verification.
 
 You do not have to use any of them. The `SessionStart` hook injects the doctrine into every session, so the rules apply even when you just talk to the agent normally.
 
@@ -107,6 +115,17 @@ The same `Stop` hook also blocks a conclusion that signs `FINDINGS: VERIFIED` wh
 
 Why it exists: in the OpenAnt adversarial-verification study, independent reproduction eliminated **49.5% of candidate findings**. And verification must be re-execution, not re-reasoning: a verifier that only re-reasons suppressed **22.25% of true positives** in Sifting the Noise, dropping its true-positive rate from 23.0 to 6.3.
 
+## The scope gate
+
+The fourth gate is the plugin's first `PreToolUse` hook: it blocks the attack command itself, not the conclusion. The first three gates refuse a *verdict* that lacks proof; this one refuses the *action* before it runs.
+
+- Attack tools — `nuclei`, `sqlmap`, `nmap`, `semgrep`, `ffuf`, `nikto`, `hydra` and friends — are matched on Bash invocations and refused outright unless `.betterzcode/security/active_scope.json` authorizes them for this session
+- A valid scope requires an environment of `dev`, `staging` or `test`, and matching target hosts — **prod is never authorizable**
+- A missing session id fails closed: no scope file, no attack commands
+- During an active scope, every URL host is confined to the declared targets
+
+The evidence for this shape is the standards themselves: authorization comes *before* testing — PTES states "It is critical that testing does not begin until this document is signed by the customer" — and AWS requires DoS-capable tools to be mechanically disarmed when unauthorized. The gate is that principle made mechanical.
+
 ## Changing the routing
 
 Each role's model and thinking level live in one place: the agent's frontmatter, in `agents/*.md`.
@@ -141,7 +160,8 @@ betterzcode/
 │   ├── betterplan.md           plan, checked against the codebase, no code written
 │   ├── betterswarm.md          full Plan Critic → Builder → Reviewer → Verifier run
 │   ├── betterresearch.md       research whose citations were actually opened
-│   └── bettersecurity.md       scoped security run with independent finding verification
+│   ├── bettersecurity.md       scoped security run with independent finding verification
+│   └── betterredteam.md        authorized impact assessment, attack commands gated by scope
 ├── skills/
 │   ├── evidence-gate/          the code doctrine in 15 rules, each sourced
 │   ├── source-gate/            the research doctrine in 12 rules, each sourced
@@ -166,6 +186,8 @@ betterzcode/
         ├── report.md       answer, findings with verbatim quotes, stated gaps
         └── evidence.jsonl  frozen copy, including every page fetched
 └── security/
+    ├── active_scope.json   transient scope authorization, read by the gate, deleted at run end
+    ├── loot.md             the chain ledger
     └── 20260819-1400_staging-check_91ab6d08/
         ├── scope.json      the written scope lock, before anything was touched
         ├── surface.md      the enumerated attack surface after recon
@@ -189,7 +211,7 @@ The log is anchored to the **project root**, not the current directory, so a pro
 
 ```bash
 node validate_zcode.mjs     # structural checks against the ZCode spec
-node test_gate.mjs          # 70 integration tests of all three gates
+node test_gate.mjs          # 88 integration tests of all four gates
 ```
 
 Both tools are dependency-free and require no build step. `test_gate.mjs` drives the hook over stdin/stdout, so it validates any implementation passed as an argument.
