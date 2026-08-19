@@ -1,6 +1,7 @@
 ---
 name: evidence-gate
 description: Doctrine of the Plan-Critic -> Builder -> Reviewer -> Verifier pipeline for GLM agents, grounded in measurements. Load it when a plan, an approach or a task breakdown is being written, when an implementation task must be seriously verified, when discussing agent code review, role separation, false-OK or over-rejection, or when configuring GLM model routing per role.
+when_to_use: when a plan or code change is being verified, routed, or its verdict is being signed
 ---
 
 # evidence-gate: the doctrine
@@ -78,3 +79,5 @@ description: Doctrine of the Plan-Critic -> Builder -> Reviewer -> Verifier pipe
 - **The 4.x family is verbose**: ~4500 output tokens for a 290-token prompt. This is the pipeline's leading cost driver.
 - **Never write tool-call syntax in plain text inside a system prompt** on the coding endpoint: the application firewall returns a spurious 429.
 - **Byte-stable system prompts**: the cache divides the input multiplier by ~4.
+
+Caution: an agent declared with a custom `tools` allowlist cannot invoke skills — this plugin's agents use `disallowedTools`, so the constraint does not bite here; never introduce a `tools` allowlist on a judging agent without also allowing the skill tool.

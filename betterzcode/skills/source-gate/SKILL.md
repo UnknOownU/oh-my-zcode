@@ -1,6 +1,7 @@
 ---
 name: source-gate
 description: Doctrine of evidence-gated research for GLM agents, grounded in measurements. Load it when researching a question against external sources, when writing or reviewing a report that cites anything, when deciding how many research agents to run or when to stop searching, or when a claim must be confronted with the source it names.
+when_to_use: when research claims or citations are being written, checked, or a report is about to be signed
 ---
 
 # source-gate: the doctrine
@@ -75,3 +76,5 @@ The `Stop` hook enforces rules 1 and 6 mechanically. A turn ending on `SOURCES: 
 - **`glm-5.3` carries a 1M-token context.** Fetched pages can stay in context in full rather than being summarised at every hop, which is what the harnesses above do to fit a smaller window. Prefer keeping the page: a summary of a source is one more layer between the claim and the text.
 - **A `max_tokens` that is too low produces an EMPTY response**: the reasoning consumes the budget. **Set `131072`, the documented ceiling, and never below** — the ceiling is free, since you pay for tokens generated, not for the limit allowed.
 - **`low` and `minimal` are forbidden for the verifying role**: 4.2 to 8.3% measured false-OK.
+
+Caution: an agent declared with a custom `tools` allowlist cannot invoke skills — this plugin's agents use `disallowedTools`, so the constraint does not bite here; never introduce a `tools` allowlist on a judging agent without also allowing the skill tool.

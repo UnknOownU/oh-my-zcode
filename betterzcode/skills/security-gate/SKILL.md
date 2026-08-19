@@ -1,6 +1,7 @@
 ---
 name: security-gate
 description: Doctrine of evidence-gated security testing for GLM agents, grounded in measurements. Load it when a security assessment, pentest or red-team run is being planned or discussed, when findings are reported, or when configuring the /bettersecurity pipeline.
+when_to_use: when any security test or red-team run is being planned, executed, or reported
 ---
 
 # security-gate: the doctrine
@@ -61,3 +62,5 @@ description: Doctrine of evidence-gated security testing for GLM agents, grounde
 ## Practice targets
 
 XBOW set via the MAPTA repo (104 web challenges), AutoPenBench (33 tasks, milestone credit), CyBench, NYU CTF. InterCode-CTF is saturated (95%) — do not practice on it.
+
+Caution: an agent declared with a custom `tools` allowlist cannot invoke skills — this plugin's agents use `disallowedTools`, so the constraint does not bite here; never introduce a `tools` allowlist on a judging agent without also allowing the skill tool.
