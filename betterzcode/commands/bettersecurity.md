@@ -1,6 +1,7 @@
 ---
 description: Evidence-gated security assessment - findings only enter the report once reproduced by an independent verifier that never sees the attacker's reasoning.
 argument-hint: "[target URL | 'code' for SAST on the local repo]"
+skills: security-gate
 ---
 
 # /bettersecurity: an assessment whose findings were actually reproduced

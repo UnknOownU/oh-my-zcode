@@ -1,6 +1,7 @@
 ---
 description: Authorized impact assessment - full compromise chains against a test/dev target you own, impact proven by sample, defenses graded - findings enter the report only once independently reproduced.
 argument-hint: "[target URL]"
+skills: security-gate
 ---
 
 # /betterredteam: what an attacker actually takes
