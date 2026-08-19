@@ -11,10 +11,12 @@
  *   session_start : injects the pipeline doctrine before the first model call.
  *   evidence      : logs the commands actually executed (PostToolUse/Bash).
  *   sources       : logs the pages actually fetched (PostToolUse/WebFetch).
- *   stop          : two gates. The evidence gate refuses a conclusion claiming
+ *   stop          : three gates. The evidence gate refuses a conclusion claiming
  *                   PASS without any verification command having run this turn.
  *                   The citation gate refuses a conclusion claiming SOURCES:
- *                   VERIFIED while citing a URL that was never fetched.
+ *                   VERIFIED while citing a URL that was never fetched. The
+ *                   findings gate refuses a security report claiming FINDINGS:
+ *                   VERIFIED without a verification command this turn.
  *
  * ZCode constraint: `async: true` prevents a hook from injecting context or
  * blocking. All of these hooks are therefore synchronous (see hooks.json).
@@ -48,7 +50,10 @@ const DOCTRINE =
   "Research obeys the same law: a source is fetched and read, never inferred from a " +
   "search snippet. A report whose citations you actually opened ends with a final " +
   "line, alone on its line: 'SOURCES: VERIFIED'. Sign it and every URL you cited is " +
-  "checked against what was really fetched.";
+  "checked against what was really fetched. " +
+  "Security findings are findings only once reproduced: a report whose every " +
+  "finding was re-executed ends with 'FINDINGS: VERIFIED' alone on the final " +
+  "line, and signing it without having run the proof will be refused.";
 
 /**
  * A command only counts as PROOF if it VERIFIES something.
@@ -69,6 +74,12 @@ const VERIFY_RE = new RegExp(
     "eslint", "biome", "ruff", "flake8", "pylint", "mypy", "pyright",
     "basedpyright", "shellcheck", "golangci-lint", "clippy",
     "make", "cmake", "ctest", "pre-commit",
+    // Security tools are deterministic judges: a scan or a reproduction command
+    // verifies a claim about a system the same way a test suite verifies a
+    // claim about code. Bare "zap" is deliberately absent: as a word it is too
+    // ambiguous and would match ordinary prose.
+    "nuclei", "semgrep", "sqlmap", "nmap", "ffuf", "nikto", "naabu",
+    "subfinder", "katana", "zap-baseline", "zap\\.sh",
   ].map((p) => `\\b(?:${p})\\b`).join("|"),
   "i",
 );
@@ -93,6 +104,14 @@ const FENCE_RE = /^\s*`{3,}\w*\s*$/;
  */
 const SOURCES_LINE_RE = /^\s*\**\s*SOURCES\s*:?\s*VERIFIED\s*\**\s*[.!]?\s*$/i;
 
+/**
+ * The security-report marker: the offensive counterpart of the PASS verdict.
+ *
+ * Same last-line-only discipline, and for the same measured reason: a gate that
+ * fires on a mention rather than on a signature punishes honesty.
+ */
+const FINDINGS_LINE_RE = /^\s*\**\s*FINDINGS\s*:?\s*VERIFIED\s*\**\s*[.!]?\s*$/i;
+
 /** Last meaningful line of a message, trailing fences stripped. Shared by both gates. */
 function lastLine(message) {
   const lines = String(message).trim().split(/\r?\n/).filter((l) => l.trim());
@@ -105,6 +124,9 @@ const claimsPass = (message) => PASS_LINE_RE.test(lastLine(message));
 
 /** True only if the message ENDS with the citation marker. */
 const claimsSourcesVerified = (message) => SOURCES_LINE_RE.test(lastLine(message));
+
+/** True only if the message ENDS with the security-report marker. */
+const claimsFindingsVerified = (message) => FINDINGS_LINE_RE.test(lastLine(message));
 
 /**
  * `)` is excluded so that a markdown link `[title](https://x)` yields the URL
@@ -281,6 +303,23 @@ function verificationsThisTurn(payload) {
   return found;
 }
 
+/**
+ * VERIFICATION commands run at any point of this session, turn boundaries
+ * ignored. The findings gate needs both windows: proof must be fresh for the
+ * signature itself, but a session with zero verification commands anywhere
+ * contradicts a FINDINGS: VERIFIED signature the same way zero retrievals
+ * contradicts SOURCES: VERIFIED.
+ */
+function verificationsThisSession(payload) {
+  const found = [];
+  for (const e of readEvidenceEntries(payload)) {
+    if (e.kind === "evidence" && e.command && VERIFY_RE.test(e.command)) {
+      found.push(e.command);
+    }
+  }
+  return found;
+}
+
 function onSessionStart(payload) {
   log(payload, { kind: "session_start", source: payload.source ?? null });
   emit({
@@ -384,6 +423,19 @@ const EVIDENCE_BLOCK =
   "If verification is impossible here, the verdict is FAIL with the reason, " +
   "never PASS by default.";
 
+/**
+ * The findings gate speaks last and refuses the cheapest way to fake a security
+ * report: signing over findings nobody re-ran in this session.
+ */
+const FINDINGS_BLOCK =
+  "Findings gate: this turn signs FINDINGS: VERIFIED while no verification " +
+  "command was executed during this turn. Re-run the deciding scan or the " +
+  "reproduction command yourself, in this session: a subagent's commands are " +
+  "not traceable from here, so they cannot back your signature. " +
+  "A finding without executed proof is an allegation. " +
+  "If verification is impossible here, do not sign: the marker is optional, " +
+  "signing it without having run the proof is not.";
+
 function citationBlock(missing) {
   const head = missing.length
     ? `${missing.length} cited source(s) were never fetched in this session: ` +
@@ -402,42 +454,40 @@ function citationBlock(missing) {
 }
 
 /**
- * Evaluates both gates without deciding what to do about the result.
+ * Evaluates all three gates without deciding what to do about the result.
  *
  * Split out from `onStop` so the verdict can be computed even on a retry, where
  * blocking is forbidden but staying informed is not.
  *
- * Evidence is evaluated first because it is the stricter claim, and only one
- * block can be emitted per turn. Both are still evaluated when a message carries
- * both signatures: a research report can conclude on code as well as on sources,
- * and each marker answers for its own claim.
+ * Every gate whose signature is present is evaluated, and every satisfied
+ * signature populates its closing fields — a research report can conclude on
+ * code, sources and findings at once, and each marker answers for its own
+ * claim. But at most ONE block is emitted per turn, in priority order:
+ * evidence first (the stricter claim), then citation, then findings — the
+ * agent must fix the most fundamental gap before the log says anything about
+ * the others.
  */
 function evaluateGates(payload, message) {
   const closing = { kind: "turn_end" };
+  let block = null;
 
   if (claimsPass(message)) {
     const proofs = verificationsThisTurn(payload);
-    if (!proofs.length) {
-      return {
-        block: { reason: "PASS without verification command", text: EVIDENCE_BLOCK },
-        closing,
-      };
+    if (!proofs.length && !block) {
+      block = { reason: "PASS without verification command", text: EVIDENCE_BLOCK };
     }
-    closing.verified_by = proofs.slice(0, 5);
+    if (proofs.length) closing.verified_by = proofs.slice(0, 5);
   }
 
   if (claimsSourcesVerified(message)) {
     const cited = citedUrls(message);
     const fetched = fetchedThisSession(payload);
     const missing = cited.filter((u) => !fetched.has(u));
-    if (missing.length) {
-      return {
-        block: {
-          reason: "SOURCES: VERIFIED with unfetched citations",
-          missing,
-          text: citationBlock(missing),
-        },
-        closing,
+    if (!block && missing.length) {
+      block = {
+        reason: "SOURCES: VERIFIED with unfetched citations",
+        missing,
+        text: citationBlock(missing),
       };
     }
     /*
@@ -454,20 +504,38 @@ function evaluateGates(payload, message) {
      * log is merely silent about. Signing with zero retrievals in the whole
      * session is still a contradiction, so that case keeps blocking.
      */
-    if (!cited.length && !fetched.size) {
-      return {
-        block: { reason: "SOURCES: VERIFIED with nothing fetched", missing: [], text: citationBlock([]) },
-        closing,
-      };
+    if (!block && !cited.length && !fetched.size) {
+      block = { reason: "SOURCES: VERIFIED with nothing fetched", missing: [], text: citationBlock([]) };
     }
-    closing.fetched_this_session = fetched.size;
-    if (cited.length) closing.sourced_by = cited.slice(0, 10);
+    if (!missing.length && (cited.length || fetched.size)) {
+      closing.fetched_this_session = fetched.size;
+      if (cited.length) closing.sourced_by = cited.slice(0, 10);
+    }
   }
 
-  return { block: null, closing };
+  if (claimsFindingsVerified(message)) {
+    const proofs = verificationsThisTurn(payload);
+    /*
+     * Same freshness window as the evidence gate: a finding speaks about the
+     * current state of a system, so its proof must be re-run in this turn. And
+     * the same empty-set contradiction as the citation gate: a session with no
+     * verification command at all cannot have reproduced anything.
+     */
+    if (!block && !proofs.length) {
+      block = {
+        reason: verificationsThisSession(payload).length
+          ? "FINDINGS: VERIFIED with no verification this turn"
+          : "FINDINGS: VERIFIED with no verification all session",
+        text: FINDINGS_BLOCK,
+      };
+    }
+    if (proofs.length) closing.findings_verified_by = proofs.slice(0, 5);
+  }
+
+  return { block, closing };
 }
 
-/** The two gates. A signature is admissible only if the runtime saw what backs it. */
+/** The three gates. A signature is admissible only if the runtime saw what backs it. */
 function onStop(payload) {
   const { block, closing } = evaluateGates(payload, String(payload.last_assistant_message ?? ""));
 
