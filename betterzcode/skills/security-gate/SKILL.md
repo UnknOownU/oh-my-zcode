@@ -46,6 +46,18 @@ description: Doctrine of evidence-gated security testing for GLM agents, grounde
 12. **FINDINGS: VERIFIED semantics.** Optional to sign. Signing it requires the deciding commands to have run in the signing session this turn — the Stop hook checks it.
     *Evidence: ZCode hooks do not fire inside subagents; a subagent's trace cannot back a signature.*
 
+13. **The beast works blind, the cage holds the rules** (red-team mode): attacker agents receive only identity, target and objective — never the rules of engagement; every constraint is enforced externally (the scope gate, the environment, the verifier). *Evidence: within authorized scope "the ROE doesn't enumerate which adversary techniques are permitted, so the controlling text is the prohibited-activities list" (Microsoft Azure, 2026); every serious offensive benchmark constrains via sandbox, never via prompt rules (CyBench, CVE-Bench, CyberGym).*
+
+14. **Attack prompts carry identity + objective only** — no rule lists, no ethics paragraphs, no over-framed authorization. *Evidence: CVE-Bench reached zero refusals with one line of white-hat framing ("white-hat hackers with permissions granted by application owners"); CyBench refusals became rare with expert/challenge framing; and over-framed authorization signals were measured ASSOCIATED WITH HIGHER refusal rates (21.8% vs 11.6%, DRB).*
+
+15. **A refusal is a failure, never a result**: an attacker that refuses is re-dispatched (adjusted framing), and an empty report caused by refusals is invalid. *Evidence: refusal-driven empty results are a measured failure mode (false-refusal 70% for one model on benign cyber prompts, CyberSecEval 2; over-conservatism observed in CyberGym-E2E).*
+
+16. **Impact is proven by sample, never by plunder**: at most 3 records or a schema screenshot prove data access; the report documents the ABILITY, not the exfiltration. *Evidence: "test only the minimum necessary to validate" (ConnectWise VDP); stop-boundaries "prevent damage while still showing that the damage could occur" (NIST SP 800-115); PTES evidences the "Ability for exfiltration".*
+
+17. **Exfiltration proof points at a listener the operator controls**: a callback to a designated URL is the entire oracle. *Evidence: the Interactsh model (an OOB callback to a tester-controlled server); CVE-Bench's goal "make the website server send a GET request to {outbound_service_url}" checked solely by that listener receiving it.*
+
+18. **The report grades the defenses too, and cleanup is re-verified by execution**: per-family detection coverage (x launched / y blocked / z logged) and a cleanup check that re-executes (declared artifacts absent). *Evidence: PTES requires countermeasure metrics ("we ran x attacks and IPS blocked y"); NIST grades detection by log review; NIST requires verified sanitization — a MECHANICAL cleanup check exceeds standard practice, stated as such.*
+
 ## Practice targets
 
 XBOW set via the MAPTA repo (104 web challenges), AutoPenBench (33 tasks, milestone credit), CyBench, NYU CTF. InterCode-CTF is saturated (95%) — do not practice on it.
