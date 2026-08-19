@@ -60,14 +60,18 @@ Read at source level, not from documentation:
 
 ## The gate
 
-The `Stop` hook enforces rules 1 and 6 mechanically. A turn ending on `SOURCES: VERIFIED` is refused when a cited URL was never fetched in that session, and refused when nothing is cited at all.
+The `Stop` hook enforces rules 1 and 6 mechanically. A turn ending on `SOURCES: VERIFIED` is refused when a cited URL was never retrieved in that session.
 
-- Only a fetch counts. A search is logged, never as proof of reading.
+- Only a retrieval counts, and it is recognised by its **input shape** — anything carrying a `url`. ZCode's `WebFetch` and Z.AI's `webReader` MCP tool both qualify; `WebSearch` and `webSearchPrime` are logged and never counted as reading.
+- **A failed retrieval is not a retrieval.** A 403 is recorded as `fetch_failed`, and citing it is refused.
+- **The gate refuses what the log contradicts, never what it is silent about.** Citing an unfetched page is a contradiction. Signing without citing anything, in a session that did fetch pages, is a silence — the citations are in the report file, and the hook only sees the message. Signing when the session retrieved nothing at all is a contradiction again, and stays blocked.
 - The window is the **session**, not the turn — unlike the evidence gate. A verdict speaks about the current state of the code, so its proof must be fresh; a paper fetched twenty minutes ago still says what it said.
 - The signature is optional and the gate is silent without it. Signing it without having opened the sources is what gets refused.
+
+*The silence rule is not a softening: it comes from a real run (2026-08-19) where an agent fetched 30 pages, cited all 30 in `report.md`, and was blocked because its closing message carried none of them. A later audit of the two records found 30 cited for 30 fetched, with no gap either way. A gate that punishes a compliant run teaches agents to stop signing, which costs you the signal entirely.*
 
 ## Operational notes for GLM
 
 - **`glm-5.3` carries a 1M-token context.** Fetched pages can stay in context in full rather than being summarised at every hop, which is what the harnesses above do to fit a smaller window. Prefer keeping the page: a summary of a source is one more layer between the claim and the text.
-- **A `max_tokens` that is too low produces an EMPTY response**: the reasoning consumes the budget. Never cap a role that returns a report.
+- **A `max_tokens` that is too low produces an EMPTY response**: the reasoning consumes the budget. **Set `131072`, the documented ceiling, and never below** — the ceiling is free, since you pay for tokens generated, not for the limit allowed.
 - **`low` and `minimal` are forbidden for the verifying role**: 4.2 to 8.3% measured false-OK.
