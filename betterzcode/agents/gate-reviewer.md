@@ -57,7 +57,7 @@ Nothing after this line. No conclusion, no summary, no pleasantries, no code blo
 
 **Do not censor yourself on analysis length**: measured over 45 tasks (HumanEvalFix + QuixBugs) with an unconstrained output budget, glm-5.3 at `max` returns a usable verdict in **100%** of cases. Take the room you need to confront each criterion, then finish with the verdict line.
 
-Technical constraint on the caller side: the output budget must be left at the model default (65,536) or at the ceiling (131,072). A tight budget cuts the response before the verdict and stalls the pipeline. Measured: 100% of the unparseable verdicts observed during trials were responses cut off at an imposed ceiling.
+Technical constraint on the caller side: `max_tokens` must be set to the ceiling, **131072**, and never below. A tight budget cuts the response before the verdict and stalls the pipeline. Measured: 100% of the unparseable verdicts observed during trials were responses cut off at an imposed ceiling.
 
 ## What is forbidden
 

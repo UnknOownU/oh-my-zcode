@@ -48,7 +48,7 @@ VERDICT: PASS
 
 or `VERDICT: FAIL` on the last line, alone, with not a single character after it.
 
-Quote command outputs in full: do not truncate them to save space. Technical constraint on the caller side: leave the output budget at the model default. Measured: 100% of the unparseable verdicts observed during trials were responses cut off by a too-tight budget, never a model defect.
+Quote command outputs in full: do not truncate them to save space. Technical constraint on the caller side: `max_tokens` must be set to the ceiling, **131072**, and never below. Measured: 100% of the unparseable verdicts observed during trials were responses cut off by a too-tight budget, never a model defect.
 
 ## Hard rules
 
