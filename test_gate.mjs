@@ -631,6 +631,153 @@ const mismatch = scopeCmd("curl -X GET https://other.example.com/api");
 check("host-mismatch block reason CONTAINS the offending host",
   blocked(mismatch) && blockReason(mismatch).includes("other.example.com"));
 
+// ---------------------------------------------------------------------------
+// 23. DISPATCH GATE (PreToolUse/Agent|Task)
+// A tagged red-team dispatch ([betterredteam <run-id>]) is admissible only
+// under a valid armed scope, and while one is armed every URL host in the
+// prompt must land inside the targets. Untagged dispatches are NEVER touched,
+// whatever their text — zero interference by construction (detection is by
+// routing tag, not language; plan-critic round 1, 2026-08-19).
+// ---------------------------------------------------------------------------
+
+const dispatch = (prompt, extra = {}) =>
+  run("dispatch", {
+    tool_name: "Agent",
+    tool_input: { prompt, description: prompt, subagent_type: "betterredteam-beast" },
+    ...extra,
+  });
+const TAGGED = "[betterredteam 20260819-2048] run nuclei against https://x.example.com";
+
+// 23.1 tagged dispatch, no scope file at all -> fail closed
+reset();
+check("tagged dispatch with NO scope file -> BLOCKS", blocked(dispatch(TAGGED)));
+
+// 23.2 a valid scope authorizes the tagged dispatch (and emits nothing)
+reset();
+writeScope({ targets: ["x.example.com"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+check("tagged dispatch under a valid scope -> passes (no output)",
+  dispatch(TAGGED) === "");
+check("...and the pass is logged as kind=dispatch_pass",
+  readFileSync(evidenceFile(), "utf8").includes('"kind":"dispatch_pass"'));
+
+// 23.3 ZERO-INTERFERENCE FREEZES (the contract): untagged dispatches quoting
+// this plan's own text verbatim are never touched, no scope armed.
+reset();
+const UNTOUCHED = [
+  "run nuclei against https://x.example.com",                          // the fixture sentence, no tag
+  "markers: `nuclei`, `sqlmap`, `ffuf`",                               // tool names in backticks
+  "exploit the target, escalate, exfiltrate the data",                 // an imperative sentence
+  "compare pentest benchmarks and red-team tooling coverage",          // a research-style prompt
+];
+for (const p of UNTOUCHED) {
+  check(`untagged dispatch NEVER touched: ${JSON.stringify(p.slice(0, 40))}`,
+    dispatch(p) === "");
+}
+
+// 23.4 prod is never a valid scope
+reset();
+writeScope({ targets: ["x.example.com"], env: "prod", session_id: SID, created: "2026-08-19T00:00:00Z" });
+check("tagged dispatch + scope env 'prod' -> BLOCKS", blocked(dispatch(TAGGED)));
+
+// 23.5 a scope from another session does not authorize this dispatch
+reset();
+writeScope({ targets: ["x.example.com"], env: "dev", session_id: "sess-someone-else", created: "2026-08-19T00:00:00Z" });
+const wrongSession = dispatch(TAGGED);
+check("tagged dispatch + scope bound to ANOTHER session -> BLOCKS",
+  blocked(wrongSession));
+check("...and the reason shows BOTH session ids",
+  blockReason(wrongSession).includes("sess-someone-else")
+  && blockReason(wrongSession).includes(SID));
+
+// 23.6 an armed scope confines the prompt: an out-of-scope host blocks
+reset();
+writeScope({ targets: ["x.example.com"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+const offTarget = dispatch("[betterredteam 20260819-2048] run nuclei against https://other.example.com");
+check("armed scope + tagged prompt naming an out-of-scope host -> BLOCKS",
+  blocked(offTarget));
+check("...and the reason contains the offending host",
+  blockReason(offTarget).includes("other.example.com"));
+
+// 23.7 payloads without a session id: tagged fails closed, untagged passes
+const noSessionDispatch = (prompt) => {
+  const p = spawnSync(RUNTIME, [HOOK, "dispatch"], {
+    input: JSON.stringify({
+      cwd: WS,
+      tool_name: "Agent",
+      tool_input: { prompt, description: prompt, subagent_type: "beast" },
+    }),
+    encoding: "utf8",
+  });
+  if (p.status !== 0) throw new Error(`exit code ${p.status} (must always be 0): ${p.stderr}`);
+  return (p.stdout ?? "").trim();
+};
+reset();
+check("tagged dispatch with NO session_id -> BLOCKS (fail closed)",
+  blocked(noSessionDispatch(TAGGED)));
+check("untagged fixture with NO session_id -> passes (untouched)",
+  noSessionDispatch("run nuclei against https://x.example.com") === "");
+
+// 23.8 malformed scope file fails closed
+reset();
+mkdirSync(join(WS, ".betterzcode", "security"), { recursive: true });
+writeFileSync(scopeFile(), "\x00\x01 not json \x02", "utf8");
+check("garbage active_scope.json + tagged dispatch -> BLOCKS (fail closed)",
+  blocked(dispatch(TAGGED)));
+
+// 23.9 every block reason carries the /betterredteam pointer
+reset();
+deleteScope();
+const noScopeBlock = dispatch(TAGGED);
+check("every block reason contains '/betterredteam'",
+  blocked(noScopeBlock) && blockReason(noScopeBlock).includes("/betterredteam"));
+
+// 23.10 a blocked tagged dispatch lands in the evidence log
+check("a blocked tagged dispatch is logged as kind=dispatch_block",
+  readFileSync(evidenceFile(), "utf8").includes('"kind":"dispatch_block"'));
+
+// 23.11 the tag is inherited: the passing path emits NOTHING (no rewriting —
+// the tag/prompt reach the beast unchanged)
+reset();
+writeScope({ targets: ["x.example.com"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+check("passing tagged dispatch emits NOTHING (stdout empty)",
+  dispatch(TAGGED) === "");
+
+// 23.12 THE INCIDENT REGRESSION (run 20260819-2107): a subfolder with its own
+// package.json must no longer hide the parent .betterzcode — the walk passes
+// OVER nearer markers and prefers the nearest .betterzcode ancestor.
+reset();
+mkdirSync(join(WS, "incident", "app"), { recursive: true });
+writeFileSync(join(WS, "incident", "app", "package.json"), "{}\n"); // the hiding marker
+writeScope({ targets: ["x.example.com"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+// writeScope writes at WS level; the scope file must move to the WS/incident root
+mkdirSync(join(WS, "incident", ".betterzcode", "security"), { recursive: true });
+writeFileSync(join(WS, "incident", ".betterzcode", "security", "active_scope.json"),
+  JSON.stringify({ targets: ["x.example.com"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" }), "utf8");
+const fromApp = (kind, toolInput) => {
+  const p = spawnSync(RUNTIME, [HOOK, kind], {
+    input: JSON.stringify({
+      session_id: SID,
+      cwd: join(WS, "incident", "app"),
+      tool_name: "Bash",
+      tool_input: toolInput,
+    }),
+    encoding: "utf8",
+  });
+  if (p.status !== 0) throw new Error(`exit code ${p.status}: ${p.stderr}`);
+  return (p.stdout ?? "").trim();
+};
+check("incident: scope armed at the parent root, cwd in a subfolder with its own package.json -> attack PASSES",
+  fromApp("scope", { command: "nuclei -u https://x.example.com" }) === "");
+check("incident: evidence lands in the parent .betterzcode (no split)",
+  existsSync(join(WS, "incident", ".betterzcode", "evidence", `${SID}.jsonl`))
+  && !existsSync(join(WS, "incident", "app", ".betterzcode")));
+// nearest-wins: a .betterzcode at WS/incident/app now shadows the parent — the
+// scope written only at WS/incident is no longer found, the attack blocks.
+mkdirSync(join(WS, "incident", "app", ".betterzcode"), { recursive: true });
+check("nearest-wins: a nearer .betterzcode shadows the parent scope -> attack BLOCKS",
+  blocked(fromApp("scope", { command: "nuclei -u https://x.example.com" })));
+rmSync(join(WS, "incident"), { recursive: true, force: true });
+
 console.log(`\n${"=".repeat(58)}\n${passed} passed, ${failed} failed`);
 rmSync(WS, { recursive: true, force: true });
 process.exit(failed ? 1 : 0);
