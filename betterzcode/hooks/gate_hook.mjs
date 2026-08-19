@@ -299,10 +299,49 @@ function projectRoot(payload) {
   return bzRoot ?? markerRoot ?? start;
 }
 
+/**
+ * Where evidence WRITES bootstrap when no .betterzcode ancestor exists.
+ *
+ * v1.9.3 Verifier finding (bootstrap poisoning): when the walk finds no
+ * .betterzcode ancestor, bootstrapping at the NEAREST marker creates an orphan
+ * .betterzcode one floor down; nearest-wins resolution then promotes that orphan
+ * to a permanent shadow of the true root, and a scope validly armed at the real
+ * root fail-closes forever. So the bootstrap goes to the WORKSPACE boundary:
+ * the HIGHEST ancestor carrying .git (the repository edge), else the HIGHEST
+ * ancestor carrying any marker. Once a .betterzcode exists anywhere, resolution
+ * is exactly today's projectRoot and this function changes nothing (reads keep
+ * today's projectRoot untouched).
+ *
+ * Home guard and 12-hop cap are inherited from the shared walk below.
+ */
+function evidenceRoot(payload) {
+  const start = payload.cwd || process.cwd();
+  const home = homedir();
+  const markers = [".betterzcode", ".git", "package.json", "pyproject.toml", "go.mod", "Cargo.toml"];
+  let dir = start;
+  let bzRoot = null; // nearest ancestor carrying .betterzcode
+  let gitRoot = null; // HIGHEST ancestor carrying .git
+  let markerRoot = null; // HIGHEST ancestor carrying any marker
+  for (let hops = 0; hops < 12; hops += 1) {
+    // Never anchor at the user's home: a stray .betterzcode there would
+    // capture the evidence of every project on the machine.
+    if (samePath(dir, home)) break;
+    if (existsSync(join(dir, ".betterzcode")) && bzRoot === null) bzRoot = dir;
+    if (existsSync(join(dir, ".git"))) gitRoot = dir; // keep climbing: highest wins
+    if (existsSync(join(dir, ".betterzcode")) || markers.slice(1).some((m) => existsSync(join(dir, m)))) {
+      markerRoot = dir; // keep climbing: highest wins
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return bzRoot ?? gitRoot ?? markerRoot ?? start;
+}
+
 /** One log per session, addressable from the session id alone. */
 function evidencePath(payload) {
   const sid = String(payload.session_id ?? "").replace(/[^\w.-]/g, "_") || "unknown";
-  return join(projectRoot(payload), ".betterzcode", "evidence", `${sid}.jsonl`);
+  return join(evidenceRoot(payload), ".betterzcode", "evidence", `${sid}.jsonl`);
 }
 
 /** Writes the protocol JSON to stdout. Nothing else may go there. */
@@ -642,18 +681,14 @@ function readScopeFile(payload) {
 }
 
 /**
- * Host (hostname, plus port when non-default) of a URL string, lowercase, or
- * null. Targets may also be written as full URLs ("https://app.example.com"),
- * so the same extraction is reused. Default ports are dropped by the URL
- * parser, so "https://a.com" and "https://a.com:443" both yield "a.com".
+ * Default ports by URL scheme. Used only for port NORMALIZATION, never for
+ * widening: a target whose explicit port equals the scheme default (443/https,
+ * 80/http) matches a URL of that scheme with the port implicit — the URL parser
+ * drops default ports, so "https://a.com" and the target "a.com:443" must
+ * reconcile. A target carrying any other explicit port still never authorizes
+ * a different port.
  */
-function hostOf(u) {
-  try {
-    return new URL(String(u)).host.toLowerCase();
-  } catch {
-    return null;
-  }
-}
+const SCHEME_DEFAULT_PORTS = { "https:": "443", "http:": "80" };
 
 /** Split "host[:port]" into [hostname, port|null]. */
 function splitHostPort(h) {
@@ -663,48 +698,58 @@ function splitHostPort(h) {
 }
 
 /**
- * Port-aware host comparison: a portless target matches by hostname alone
- * (any port); a ported target requires hostname AND port equality — it never
- * authorizes a different port.
+ * Port-aware comparison of a parsed URL against a "host[:port]" target:
+ * a portless target matches by hostname alone (any port); a ported target
+ * requires hostname AND port equality — with the single default-port
+ * normalization above (target port == scheme default, URL port implicit).
+ * A ported target NEVER authorizes a different explicit port.
  */
-function hostPortMatches(host, targetHost) {
-  const [hh, hp] = splitHostPort(host);
+function hostPortMatches(url, targetHost) {
   const [th, tp] = splitHostPort(targetHost);
+  const hh = url.hostname.toLowerCase();
   if (!th || !hh || hh !== th) return false;
   if (tp === null || tp === "") return true;
-  return tp === hp;
+  if (tp === url.port) return true;
+  return !url.port && tp === SCHEME_DEFAULT_PORTS[url.protocol];
 }
 
 /**
- * Does `host` fall inside a declared target? Exact host, or wildcard suffix:
- * "*.example.com" admits any subdomain but never the bare "example.com".
- * Both sides may carry a port; port-aware via hostPortMatches.
+ * Does a parsed URL fall inside a declared target? Exact host, or wildcard
+ * suffix: "*.example.com" admits any subdomain but never the bare
+ * "example.com". Both sides may carry a port; port-aware via hostPortMatches.
  */
-function hostMatchesTarget(host, target) {
+function hostMatchesTarget(url, target) {
   const t = String(target ?? "").trim().toLowerCase();
-  if (!t || !host) return false;
+  if (!t) return false;
   if (t.includes("://")) {
-    const tHost = hostOf(t);
-    return tHost !== null && hostPortMatches(host, tHost);
+    let tHost;
+    try {
+      tHost = new URL(t).host.toLowerCase();
+    } catch {
+      return false;
+    }
+    return hostPortMatches(url, tHost);
   }
   const wildcard = /^\*\.(.+)$/.exec(t);
   if (wildcard) {
     const [wh, wp] = splitHostPort(wildcard[1]);
-    const [hh, hp] = splitHostPort(host);
+    const hh = url.hostname.toLowerCase();
     if (!hh.endsWith(`.${wh}`)) return false;
-    return wp === null || wp === "" || wp === hp;
+    if (wp === null || wp === "") return true;
+    return wp === url.port || (!url.port && wp === SCHEME_DEFAULT_PORTS[url.protocol]);
   }
-  return hostPortMatches(host, t);
+  return hostPortMatches(url, t);
 }
 
-/** Every http(s) host named in the command, in order. */
-function commandHosts(command) {
-  const hosts = [];
-  for (const u of String(command).match(SCOPE_URL_RE) ?? []) {
-    const h = hostOf(u);
-    if (h) hosts.push(h);
+/** Every http(s) URL parsed out of the text, in order (scheme context included). */
+function commandUrls(text) {
+  const urls = [];
+  for (const u of String(text).match(SCOPE_URL_RE) ?? []) {
+    try {
+      urls.push(new URL(u));
+    } catch { /* not a parseable URL: skip */ }
   }
-  return hosts;
+  return urls;
 }
 
 function scopeBlock(payload, command, reason) {
@@ -768,10 +813,10 @@ function onScope(payload) {
     && scope.targets.length
     && typeof scope.env === "string" && scope.env !== "prod"
     && scope.session_id === payload.session_id) {
-    const hosts = commandHosts(command);
-    for (const h of hosts) {
-      if (!scope.targets.some((t) => hostMatchesTarget(h, t))) {
-        scopeBlock(payload, command, `host not in scope targets: ${h}`);
+    const hosts = commandUrls(command);
+    for (const u of hosts) {
+      if (!scope.targets.some((t) => hostMatchesTarget(u, t))) {
+        scopeBlock(payload, command, `host not in scope targets: ${u.host}`);
         return;
       }
     }
@@ -846,9 +891,9 @@ function onDispatch(payload) {
 
   // 3. Valid scope armed: every URL host in the prompt must land inside the
   //    declared targets — same extraction and comparison as the Bash gate.
-  for (const h of commandHosts(prompt)) {
-    if (!scope.targets.some((t) => hostMatchesTarget(h, t))) {
-      dispatchBlock(payload, `host not in scope targets: ${h}`, head);
+  for (const u of commandUrls(prompt)) {
+    if (!scope.targets.some((t) => hostMatchesTarget(u, t))) {
+      dispatchBlock(payload, `host not in scope targets: ${u.host}`, head);
       return;
     }
   }
