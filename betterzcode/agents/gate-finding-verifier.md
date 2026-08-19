@@ -3,7 +3,7 @@ name: gate-finding-verifier
 description: Re-executes candidate security findings without seeing the attacker's reasoning, and confirms only what reproduces. Use after attackers deliver candidate findings in the BetterZcode security pipeline.
 model: glm-5.3
 thoughtLevel: max
-color: purple
+color: orange
 maxTurns: 30
 injectAgentsMd: true
 disallowedTools: Write, Edit

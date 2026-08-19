@@ -3,7 +3,7 @@ name: gate-reviewer
 description: Reviews a Builder's artifact like a pull request review, in a fresh context. States its criteria BEFORE seeing the code, returns localised findings, then signs off or sends it back. Use after a Builder has delivered its artifact in the BetterZcode pipeline.
 model: glm-5.3
 thoughtLevel: high
-color: orange
+color: yellow
 maxTurns: 25
 injectAgentsMd: true
 disallowedTools: Write, Edit
