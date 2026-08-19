@@ -15,6 +15,7 @@
 | **REVIEWER** (reviews, does not code) | `glm-5.3` in a **fresh context** | `high` | **0% false-OK and 6.2% false-reject vs 21–26% for all the others [MEASURED]**; 2.5× faster |
 | **QA** (executes, proves) | `glm-5.3` | `high` | ⚠️ **Changed after EXP-6**: on real multi-file patches, glm-4.7 rejects 78% of correct code and identifies the real defect only 11.8% of the time **[MEASURED]** (see §3quater) |
 | **SOURCE VERIFIER** (confronts a claim with its source) | `glm-5.3` | `high` | Same 0% false-OK / 0% false-reject configuration as the other judging roles **[MEASURED]**; and the capability floor is load-bearing: the same citation-repair protocol scores 90.7% with a frontier model against 79.3% with a mid-size one, called "not yet on-par" by its authors **[PUBLISHED]** |
+| **FINDING VERIFIER** (re-executes security findings) | `glm-5.3` | `max` | Judged-role floor (0% false-OK config family) **[MEASURED]**; `max` is the owner's call (2026-08-19) — security runs are rare and every confirmed finding triggers human remediation, so the 28.67-point/review cost that disqualified max for the code Verifier is accepted here; never glm-5-turbo (3% false-OK) **[MEASURED]** |
 | **Fallback QA / fast recon** | `glm-5-turbo` | `low` | Cheapest in tokens **[MEASURED]** — but **never as Reviewer** (see §3) |
 | **NEVER Reviewer** | `glm-5-turbo` | — | Only model that approves defective code (3% false-OK) **[MEASURED]** + worst reviewer of 5 models in arXiv 2606.15689 **[PUBLISHED]** |
 
