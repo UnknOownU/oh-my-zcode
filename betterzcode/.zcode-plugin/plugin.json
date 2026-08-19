@@ -1,7 +1,7 @@
 {
   "name": "betterzcode",
-  "version": "1.4.0",
-  "description": "Your agent cannot call a task done without proving it. Separate agents check the plan, write the code, review it and verify it by execution, and a hook blocks any success verdict that no executed test, linter or build supports. An agent that writes is never an agent that judges.",
+  "version": "1.5.0",
+  "description": "Your agent cannot call a task done without proving it, and cannot cite a source it never opened. Separate agents check the plan, write the code, review it and verify it by execution; hooks block any success verdict no executed test supports, and any report citing a page that was never fetched. An agent that writes is never an agent that judges.",
   "author": {
     "name": "UnknOownU",
     "url": "https://github.com/UnknOownU"
@@ -14,7 +14,9 @@
     "glm",
     "pipeline",
     "verification",
-    "evidence-gate"
+    "evidence-gate",
+    "research",
+    "citations"
   ],
   "agents": "agents",
   "commands": "commands",
