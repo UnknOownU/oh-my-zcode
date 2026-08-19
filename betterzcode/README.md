@@ -73,15 +73,21 @@ Both refinements come from real sessions, not theory. The first version counted 
 
 ## The citation gate
 
-The same `Stop` hook blocks a conclusion that signs `SOURCES: VERIFIED` while citing a page that was never fetched.
+The same `Stop` hook blocks a conclusion that signs `SOURCES: VERIFIED` while citing a page that was never retrieved.
 
-- **A search is not a source.** A search returns a snippet selected to match your query, so a claim resting on one is a claim about the snippet. Only `WebFetch` counts; `WebSearch` is logged, never as proof of reading
-- **Signing over nothing is also blocked**: a marker with no citation at all would be the cheapest way to disarm the gate
+- **A search is not a source.** A search returns a snippet selected to match your query, so a claim resting on one is a claim about the snippet. Retrievals are recognised by their **input shape** — anything carrying a `url` — so ZCode's `WebFetch` and Z.AI's `webReader` MCP tool both count, while `WebSearch` and `webSearchPrime` are logged and never counted as reading
+- **A failed retrieval is not a source either.** A 403 is logged as `fetch_failed`, and citing it is refused
+- **Refuse what the log contradicts, never what it is silent about.** A signature citing a page nobody fetched is blocked. A signature that cites nothing while the session fetched pages is not — the citations are in the report file, and the gate reads the message
+- **Signing with nothing retrieved all session is still blocked**: that one is a contradiction, and it would be the cheapest way to disarm the gate
 - The window is the **session**, not the turn — deliberately unlike the evidence gate. A verdict speaks about the current state of the code so its proof must be fresh; a paper fetched twenty minutes ago still says what it said
 - URLs are compared after normalisation, and arXiv `/abs/` and `/pdf/` are treated as one document — fetching the PDF and citing the abstract page is how anyone actually reads a paper
 - The marker is **optional** and the gate is silent without it. What gets refused is signing it without having opened the sources
 
 Why it exists: across 58,000 claim/source pairs, **50 to 90% of model citations are not fully supported** by the source they name, and the rate collapses further on open-ended questions (SourceCheckup, *Nature Communications* 2025). Nothing in the field guards against it.
+
+**Refined by a real run, like the evidence gate before it.** On 2026-08-19 a competitive study fetched 30 pages, wrote all 30 URLs into `report.md`, and signed in a chat message that carried none of them. An audit of the two records afterwards found **30 cited for 30 fetched, no gap in either direction** — and the gate had blocked it anyway, because it reads the message and the citations were in the artifact. Three things changed as a result: the silence rule above, the failed-retrieval rule, and the bypass below. All three are frozen as regression tests, replayed against that session's untouched log.
+
+**The anti-loop no longer goes blind.** ZCode caps retries, so the gate never blocks twice in a turn. It used to stop evaluating entirely on the retry, which made a bypassed gate indistinguishable from a satisfied one in the log. It now still evaluates and records `gate_bypassed` — it just does not act on it.
 
 ## Changing the routing
 
@@ -98,14 +104,14 @@ There is deliberately **no settings panel**. ZCode only substitutes `${user_conf
 
 Two settings are not knobs but rules, and they are enforced in the prompts:
 
-- **Never lower the output budget.** Measured: with a 2500-token ceiling, 100% of unparseable verdicts were responses cut off before the verdict line, dropping apparent accuracy from 97.8% to 77.8%.
+- **Set `max_tokens` to 131072 — the documented ceiling — and never below.** Measured: with a 2500-token ceiling, 100% of unparseable verdicts were responses cut off before the verdict line, dropping apparent accuracy from 97.8% to 77.8%. The ceiling is free: you are billed for the tokens generated, not for the limit you allow.
 - **Never route a judging role to `glm-5-turbo`** (3% measured false-OK) **or `glm-4.7` on multi-file code** (77.8% measured false-reject).
 
 ## Contents
 
 ```
 betterzcode/
-├── .zcode-plugin/plugin.json   manifest + userConfig
+├── .zcode-plugin/plugin.json   manifest
 ├── agents/
 │   ├── gate-plan-critic.md     glm-5.3 / max  — checks the plan before a line is written
 │   ├── gate-builder.md         glm-5.3 / max  — implements, never validates itself
@@ -156,7 +162,7 @@ The log is anchored to the **project root**, not the current directory, so a pro
 
 ```bash
 node validate_zcode.mjs     # structural checks against the ZCode spec
-node test_gate.mjs          # 45 integration tests of both gates
+node test_gate.mjs          # 56 integration tests of both gates
 ```
 
 Both tools are dependency-free and require no build step. `test_gate.mjs` drives the hook over stdin/stdout, so it validates any implementation passed as an argument.
