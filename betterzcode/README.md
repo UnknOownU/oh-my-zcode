@@ -151,7 +151,7 @@ Full evidence for every routing decision: [docs/routing.md](docs/routing.md). `v
 ### Development
 
 ```bash
-node test_gate.mjs         # 92 integration tests of all four gates
+node test_gate.mjs         # 121 integration tests of all four gates
 node validate_zcode.mjs    # structural checks against the ZCode spec
 ```
 
