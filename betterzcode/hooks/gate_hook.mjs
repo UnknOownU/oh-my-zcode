@@ -601,10 +601,8 @@ function onStop(payload) {
  * Missing or unparsable file fails CLOSED for attack tools and stays silent
  * for everything else — a normal dev session must feel zero interference.
  */
-const SCOPE_BLOCK_TEXT =
-  "Scope gate: this attack command is blocked. No valid authorization for " +
-  "this session: testing requires an active scope (env dev/staging/test, " +
-  "matching session) created via /betterredteam.";
+const SCOPE_POINTER =
+  "Scope gate: authorization is created via /betterredteam.";
 
 function scopeFilePath(payload) {
   return join(projectRoot(payload), ".betterzcode", "security", "active_scope.json");
@@ -620,31 +618,59 @@ function readScopeFile(payload) {
 }
 
 /**
- * Host of a URL string, lowercase, or null. Targets may also be written as
- * full URLs ("https://app.example.com"), so the same extraction is reused.
+ * Host (hostname, plus port when non-default) of a URL string, lowercase, or
+ * null. Targets may also be written as full URLs ("https://app.example.com"),
+ * so the same extraction is reused. Default ports are dropped by the URL
+ * parser, so "https://a.com" and "https://a.com:443" both yield "a.com".
  */
 function hostOf(u) {
   try {
-    return new URL(String(u)).hostname.toLowerCase();
+    return new URL(String(u)).host.toLowerCase();
   } catch {
     return null;
   }
 }
 
+/** Split "host[:port]" into [hostname, port|null]. */
+function splitHostPort(h) {
+  const i = h.lastIndexOf(":");
+  if (i === -1) return [h, null];
+  return [h.slice(0, i), h.slice(i + 1)];
+}
+
+/**
+ * Port-aware host comparison: a portless target matches by hostname alone
+ * (any port); a ported target requires hostname AND port equality — it never
+ * authorizes a different port.
+ */
+function hostPortMatches(host, targetHost) {
+  const [hh, hp] = splitHostPort(host);
+  const [th, tp] = splitHostPort(targetHost);
+  if (!th || !hh || hh !== th) return false;
+  if (tp === null || tp === "") return true;
+  return tp === hp;
+}
+
 /**
  * Does `host` fall inside a declared target? Exact host, or wildcard suffix:
  * "*.example.com" admits any subdomain but never the bare "example.com".
+ * Both sides may carry a port; port-aware via hostPortMatches.
  */
 function hostMatchesTarget(host, target) {
   const t = String(target ?? "").trim().toLowerCase();
   if (!t || !host) return false;
   if (t.includes("://")) {
     const tHost = hostOf(t);
-    return tHost !== null && tHost === host;
+    return tHost !== null && hostPortMatches(host, tHost);
   }
   const wildcard = /^\*\.(.+)$/.exec(t);
-  if (wildcard) return host.endsWith(`.${wildcard[1]}`);
-  return t === host;
+  if (wildcard) {
+    const [wh, wp] = splitHostPort(wildcard[1]);
+    const [hh, hp] = splitHostPort(host);
+    if (!hh.endsWith(`.${wh}`)) return false;
+    return wp === null || wp === "" || wp === hp;
+  }
+  return hostPortMatches(host, t);
 }
 
 /** Every http(s) host named in the command, in order. */
@@ -663,7 +689,7 @@ function scopeBlock(payload, command, reason) {
     reason,
     command: String(command).slice(0, 200),
   });
-  emit({ decision: "block", reason: SCOPE_BLOCK_TEXT });
+  emit({ decision: "block", reason: `Scope gate: ${reason}\n${SCOPE_POINTER}` });
 }
 
 function onScope(payload) {
@@ -677,7 +703,14 @@ function onScope(payload) {
   // 1. No session id: not a real turn. Attack tools still fail closed —
   //    an untraceable caller must not get the gun — everything else passes.
   if (!payload.session_id) {
-    if (isAttack) emit({ decision: "block", reason: SCOPE_BLOCK_TEXT });
+    if (isAttack) {
+      emit({
+        decision: "block",
+        reason:
+          "Scope gate: attack command from a caller with no session id " +
+          "(untraceable caller, fails closed).\n" + SCOPE_POINTER,
+      });
+    }
     return;
   }
 
@@ -692,12 +725,14 @@ function onScope(payload) {
     if (!valid) {
       scopeBlock(payload, command,
         scope === null
-          ? "no scope file"
-          : scope.env === "prod"
-            ? "scope env is prod"
-            : scope.session_id !== payload.session_id
-              ? "scope belongs to another session"
-              : "scope file invalid");
+          ? existsSync(scopeFilePath(payload))
+            ? "active_scope.json is present but malformed (unparsable JSON)"
+            : "no active_scope.json — no scope file for this session"
+          : !Array.isArray(scope.targets) || !scope.targets.length
+            ? "scope file invalid: targets is missing or empty"
+            : !(typeof scope.env === "string" && scope.env !== "prod")
+              ? `scope env invalid (got ${JSON.stringify(scope.env)})`
+              : `scope belongs to another session (scope session_id=${JSON.stringify(scope.session_id)}, this session=${JSON.stringify(payload.session_id)})`);
       return;
     }
   }
