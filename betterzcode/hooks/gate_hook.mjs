@@ -6,11 +6,15 @@
  * code and JSON on stdout. Anything that is not a protocol result must go to
  * stderr, otherwise the response is corrupted.
  *
- * Four roles, selected by argv[2]:
+ * Five roles, selected by argv[2]:
  *
  *   session_start : injects the pipeline doctrine before the first model call.
  *   evidence      : logs the commands actually executed (PostToolUse/Bash).
  *   sources       : logs the pages actually fetched (PostToolUse/WebFetch).
+ *   scope         : the scope gate (PreToolUse/Bash). Blocks attack commands
+ *                   unless a valid authorization (active_scope.json, env
+ *                   dev/staging/test, matching session) exists, and confines
+ *                   every URL a scoped session touches to the declared targets.
  *   stop          : three gates. The evidence gate refuses a conclusion claiming
  *                   PASS without any verification command having run this turn.
  *                   The citation gate refuses a conclusion claiming SOURCES:
@@ -83,6 +87,22 @@ const VERIFY_RE = new RegExp(
   ].map((p) => `\\b(?:${p})\\b`).join("|"),
   "i",
 );
+
+/**
+ * Commands that attack a system. Same word-boundary style and the same
+ * deliberate omissions as VERIFY_RE: bare "zap" stays out — as a word it is
+ * too ambiguous — while its unambiguous spellings stay in.
+ */
+const ATTACK_RE = new RegExp(
+  [
+    "nuclei", "semgrep", "sqlmap", "nmap", "ffuf", "nikto", "naabu",
+    "subfinder", "katana", "hydra", "zap-baseline", "zap\\.sh",
+  ].map((p) => `\\b(?:${p})\\b`).join("|"),
+  "i",
+);
+
+/** A local copy of the URL pattern: the shared one is /g and stateful. */
+const SCOPE_URL_RE = /https?:\/\/[^\s<>()[\]"'`]+/gi;
 
 /**
  * The doctrine defines a verdict as "a final line, alone on its line".
@@ -572,10 +592,143 @@ function onStop(payload) {
   log(payload, closing);
 }
 
+/**
+ * The scope gate (PreToolUse/Bash), fourth mechanical gate.
+ *
+ * An attack command is admissible only against a declared scope: the file
+ * <root>/.betterzcode/security/active_scope.json, created by /betterredteam,
+ * naming the authorised targets, a non-prod env and the owning session.
+ * Missing or unparsable file fails CLOSED for attack tools and stays silent
+ * for everything else — a normal dev session must feel zero interference.
+ */
+const SCOPE_BLOCK_TEXT =
+  "Scope gate: this attack command is blocked. No valid authorization for " +
+  "this session: testing requires an active scope (env dev/staging/test, " +
+  "matching session) created via /betterredteam.";
+
+function scopeFilePath(payload) {
+  return join(projectRoot(payload), ".betterzcode", "security", "active_scope.json");
+}
+
+/** Parsed scope file, or null when missing/unparsable. Null = no valid scope. */
+function readScopeFile(payload) {
+  try {
+    return JSON.parse(readFileSync(scopeFilePath(payload), "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Host of a URL string, lowercase, or null. Targets may also be written as
+ * full URLs ("https://app.example.com"), so the same extraction is reused.
+ */
+function hostOf(u) {
+  try {
+    return new URL(String(u)).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Does `host` fall inside a declared target? Exact host, or wildcard suffix:
+ * "*.example.com" admits any subdomain but never the bare "example.com".
+ */
+function hostMatchesTarget(host, target) {
+  const t = String(target ?? "").trim().toLowerCase();
+  if (!t || !host) return false;
+  if (t.includes("://")) {
+    const tHost = hostOf(t);
+    return tHost !== null && tHost === host;
+  }
+  const wildcard = /^\*\.(.+)$/.exec(t);
+  if (wildcard) return host.endsWith(`.${wildcard[1]}`);
+  return t === host;
+}
+
+/** Every http(s) host named in the command, in order. */
+function commandHosts(command) {
+  const hosts = [];
+  for (const u of String(command).match(SCOPE_URL_RE) ?? []) {
+    const h = hostOf(u);
+    if (h) hosts.push(h);
+  }
+  return hosts;
+}
+
+function scopeBlock(payload, command, reason) {
+  log(payload, {
+    kind: "scope_block",
+    reason,
+    command: String(command).slice(0, 200),
+  });
+  emit({ decision: "block", reason: SCOPE_BLOCK_TEXT });
+}
+
+function onScope(payload) {
+  const ti = payload.tool_input;
+  const command = ti && typeof ti === "object" ? String(ti.command ?? "") : "";
+  if (!command) return;
+  const head = command.slice(0, 200);
+  const isAttack = ATTACK_RE.test(command);
+  const scope = readScopeFile(payload);
+
+  // 1. No session id: not a real turn. Attack tools still fail closed —
+  //    an untraceable caller must not get the gun — everything else passes.
+  if (!payload.session_id) {
+    if (isAttack) emit({ decision: "block", reason: SCOPE_BLOCK_TEXT });
+    return;
+  }
+
+  // 2. An attack command requires a valid scope: parsable file, non-prod
+  //    env, session match. Any failure blocks.
+  if (isAttack) {
+    const valid = scope !== null
+      && Array.isArray(scope.targets)
+      && scope.targets.length
+      && typeof scope.env === "string" && scope.env !== "prod"
+      && scope.session_id === payload.session_id;
+    if (!valid) {
+      scopeBlock(payload, command,
+        scope === null
+          ? "no scope file"
+          : scope.env === "prod"
+            ? "scope env is prod"
+            : scope.session_id !== payload.session_id
+              ? "scope belongs to another session"
+              : "scope file invalid");
+      return;
+    }
+  }
+
+  // 3. A VALID scope active: every URL in EVERY command must land inside the
+  //    declared targets — attack tool, curl, wget, anything.
+  if (scope !== null
+    && Array.isArray(scope.targets)
+    && scope.targets.length
+    && typeof scope.env === "string" && scope.env !== "prod"
+    && scope.session_id === payload.session_id) {
+    const hosts = commandHosts(command);
+    for (const h of hosts) {
+      if (!scope.targets.some((t) => hostMatchesTarget(h, t))) {
+        scopeBlock(payload, command, `host not in scope targets: ${h}`);
+        return;
+      }
+    }
+    log(payload, { kind: "scope_pass", command: head });
+    return;
+  }
+
+  // 4. No valid scope and not an attack tool: a normal dev session. Allow,
+  //    silently — logging every innocent command would bury the audit trail.
+}
+
 const HANDLERS = {
   session_start: onSessionStart,
   evidence: onEvidence,
   sources: onSources,
+  scope: onScope,
   stop: onStop,
 };
 

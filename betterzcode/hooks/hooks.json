@@ -47,6 +47,22 @@
         ]
       }
     ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "node",
+            "args": [
+              "${ZCODE_PLUGIN_ROOT}/hooks/gate_hook.mjs",
+              "scope"
+            ],
+            "timeoutMs": 5000
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
