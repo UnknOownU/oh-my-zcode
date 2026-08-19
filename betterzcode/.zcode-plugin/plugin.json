@@ -1,6 +1,6 @@
 {
   "name": "betterzcode",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Your agent cannot call a task done without proving it, and cannot cite a source it never opened. Separate agents check the plan, write the code, review it and verify it by execution; hooks block any success verdict no executed test supports, and any report citing a page that was never fetched. An agent that writes is never an agent that judges.",
   "author": {
     "name": "UnknOownU",
