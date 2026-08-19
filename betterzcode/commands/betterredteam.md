@@ -34,6 +34,10 @@ After the explicit yes, write TWO files:
 - `.betterzcode/security/<YYYYMMDD-HHMM>_<slug>_<session8>/scope.json` — the frozen record: targets, env, timestamp, the user's confirmation quoted verbatim.
 - `.betterzcode/security/active_scope.json` (project root's `.betterzcode/security/`) — the gate-readable record: `targets` (array of hosts, wildcards allowed), `env` (`dev|staging|test`), `session_id` (the current session id), `created` (ISO).
 
+  Targets contract: hosts are written WITHOUT port by default (`localhost`, `staging.app.io`, `*.app.io`; full URLs also work) — a portless target authorizes the host on ANY port. A target MAY carry a port (`localhost:3000`) and then authorizes ONLY that port, never another.
+
+  Session id: the current session id is the NEWEST file in `.betterzcode/evidence/` (written by the hook) — never guess it from agent output paths.
+
 State to the user: the scope gate now enforces this mechanically — attack commands outside this scope and session are blocked.
 
 ## Step 0.6: PREFLIGHT
