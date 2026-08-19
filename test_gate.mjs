@@ -778,6 +778,93 @@ check("nearest-wins: a nearer .betterzcode shadows the parent scope -> attack BL
   blocked(fromApp("scope", { command: "nuclei -u https://x.example.com" })));
 rmSync(join(WS, "incident"), { recursive: true, force: true });
 
+// ---------------------------------------------------------------------------
+// 24. BOUNDARY BOOTSTRAP + DEFAULT PORTS
+// 24.1-24.3 freeze the v1.9.3 Verifier finding (bootstrap poisoning): an
+// evidence bootstrap at the NEAREST marker creates an orphan .betterzcode that
+// nearest-wins promotes to a permanent shadow of the true root. Evidence
+// writes therefore bootstrap at the WORKSPACE boundary (highest .git ancestor,
+// else highest marker ancestor) when no .betterzcode ancestor exists.
+// 24.4-24.6 freeze default-port normalization: a target whose explicit port
+// equals the scheme default matches an implicit-port URL of that scheme, and
+// a ported target never authorizes a different explicit port.
+// ---------------------------------------------------------------------------
+
+const hookRun = (kind, payload) => {
+  const p = spawnSync(RUNTIME, [HOOK, kind], {
+    input: JSON.stringify({ session_id: SID, ...payload }),
+    encoding: "utf8",
+  });
+  if (p.status !== 0) throw new Error(`exit code ${p.status}: ${p.stderr}`);
+  return (p.stdout ?? "").trim();
+};
+const attackFrom = (cwd) =>
+  hookRun("scope", { cwd, tool_name: "Bash", tool_input: { command: "nuclei -u https://x.example.com" } });
+const evFile = (root) => join(root, ".betterzcode", "evidence", `${SID}.jsonl`);
+
+// 24.1 WS and WS/app both carry package.json, no .betterzcode anywhere:
+// a scope BLOCK (evidence write) bootstraps at WS, NOT at the nearest marker.
+const W1 = mkdtempSync(join(tmpdir(), "gate-boot-"));
+mkdirSync(join(W1, "app"), { recursive: true });
+writeFileSync(join(W1, "package.json"), "{}\n");
+writeFileSync(join(W1, "app", "package.json"), "{}\n");
+check("24.1 poison-free bootstrap: block from WS/app writes evidence at WS",
+  blocked(attackFrom(join(W1, "app")))
+  && existsSync(evFile(W1))
+  && !existsSync(join(W1, "app", ".betterzcode")));
+
+// 24.3 the incident's happy ending: with the bootstrap landed at WS, arming the
+// scope at WS works from WS/app — no orphan shadow, no fail-closed lockout.
+mkdirSync(join(W1, ".betterzcode", "security"), { recursive: true });
+writeFileSync(join(W1, ".betterzcode", "security", "active_scope.json"),
+  JSON.stringify({ targets: ["x.example.com"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" }), "utf8");
+check("24.3 scope armed at WS is honoured from WS/app (attack PASSES)",
+  attackFrom(join(W1, "app")) === "");
+rmSync(W1, { recursive: true, force: true });
+
+// 24.2 same setup + .git at WS: the bootstrap lands at WS even though app is
+// the nearest marker (repository edge preferred).
+const W2 = mkdtempSync(join(tmpdir(), "gate-git-"));
+mkdirSync(join(W2, "app"), { recursive: true });
+mkdirSync(join(W2, ".git"), { recursive: true });
+writeFileSync(join(W2, "package.json"), "{}\n");
+writeFileSync(join(W2, "app", "package.json"), "{}\n");
+check("24.2 .git ancestor wins over the nearest marker",
+  blocked(attackFrom(join(W2, "app")))
+  && existsSync(evFile(W2))
+  && !existsSync(join(W2, "app", ".betterzcode")));
+rmSync(W2, { recursive: true, force: true });
+
+// 24.7 fresh workspace unchanged: cwd == WS root, no .betterzcode -> the first
+// session_start log write creates WS/.betterzcode (the SessionStart case).
+const W3 = mkdtempSync(join(tmpdir(), "gate-fresh-"));
+writeFileSync(join(W3, "package.json"), "{}\n");
+hookRun("session_start", { cwd: W3, source: "startup" });
+check("24.7 fresh workspace: first log write creates WS/.betterzcode",
+  existsSync(evFile(W3)));
+rmSync(W3, { recursive: true, force: true });
+
+// 24.4 default-port normalization: target :443 + implicit-port https URL
+reset();
+writeScope({ targets: ["example.com:443"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+check("24.4 target example.com:443 + https://example.com/x -> PASSES (gap closed)",
+  scopeCmd("curl -s https://example.com/x") === "");
+
+// 24.5 the http counterpart
+writeScope({ targets: ["example.com:80"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+check("24.5 target example.com:80 + http://example.com/x -> PASSES",
+  scopeCmd("curl -s http://example.com/x") === "");
+
+// 24.6 NO WIDENING: an explicit non-default port never matches the target port
+writeScope({ targets: ["example.com:443"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+check("24.6 target example.com:443 + https://example.com:8443/x -> BLOCKS (no widening)",
+  blocked(scopeCmd("curl -s https://example.com:8443/x")));
+
+// re-assert: a portless target matches any port (unchanged behavior)
+writeScope({ targets: ["example.com"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+check("portless target still matches a ported URL host",
+  scopeCmd("curl -s https://example.com:8443/x") === "");
+
 console.log(`\n${"=".repeat(58)}\n${passed} passed, ${failed} failed`);
 rmSync(WS, { recursive: true, force: true });
 process.exit(failed ? 1 : 0);
