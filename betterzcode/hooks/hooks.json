@@ -33,7 +33,7 @@
         ]
       },
       {
-        "matcher": "WebFetch|WebSearch",
+        "matcher": "WebFetch|WebSearch|webReader|webSearchPrime|web_reader|web_search_prime",
         "hooks": [
           {
             "type": "process",

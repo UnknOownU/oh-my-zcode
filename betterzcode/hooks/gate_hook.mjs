@@ -6,7 +6,7 @@
  * code and JSON on stdout. Anything that is not a protocol result must go to
  * stderr, otherwise the response is corrupted.
  *
- * Three roles, selected by argv[2]:
+ * Four roles, selected by argv[2]:
  *
  *   session_start : injects the pipeline doctrine before the first model call.
  *   evidence      : logs the commands actually executed (PostToolUse/Bash).
@@ -17,7 +17,7 @@
  *                   VERIFIED while citing a URL that was never fetched.
  *
  * ZCode constraint: `async: true` prevents a hook from injecting context or
- * blocking. These three hooks are therefore synchronous (see hooks.json).
+ * blocking. All of these hooks are therefore synchronous (see hooks.json).
  *
  * Robustness contract: NEVER break a session. Every exception is swallowed,
  * the exit code stays 0, and no output means "no effect".
@@ -41,8 +41,10 @@ const DOCTRINE =
   "and will be refused at the conclusion. " +
   "Every verdict ends with a final line, alone on its line: 'VERDICT: PASS' or " +
   "'VERDICT: FAIL'. " +
-  "Never cap the output budget of a role that returns a verdict: a response cut " +
-  "off before its last line is the leading measured cause of unparseable verdicts. " +
+  "Set max_tokens to 131072, the documented ceiling, and never below for any role " +
+  "that returns a verdict: a response cut off before its last line is the leading " +
+  "measured cause of unparseable verdicts, and the ceiling costs nothing you do " +
+  "not generate. " +
   "Research obeys the same law: a source is fetched and read, never inferred from a " +
   "search snippet. A report whose citations you actually opened ends with a final " +
   "line, alone on its line: 'SOURCES: VERIFIED'. Sign it and every URL you cited is " +
@@ -138,22 +140,19 @@ function citedUrls(message) {
 }
 
 /**
- * Pages actually FETCHED during this session.
- *
- * The window is the session, not the turn — deliberately unlike the evidence
- * gate. A verdict speaks about the current state of the code, so its proof must
- * be fresh; a paper fetched twenty minutes ago still says what it said. Scoping
- * sources to the turn would force a re-fetch of every citation at write-up time.
+ * Parsed evidence entries for this session, oldest first. Reading the log and
+ * filtering by session is shared by both gates; they differ only in WHAT they
+ * count once the entries are in hand.
  */
-function fetchedThisSession(payload) {
+function readEvidenceEntries(payload) {
   const sid = payload.session_id ?? null;
-  const found = new Set();
   let raw;
   try {
     raw = readFileSync(evidencePath(payload), "utf8");
   } catch {
-    return found;
+    return [];
   }
+  const entries = [];
   for (const line of raw.split(/\r?\n/)) {
     if (!line.trim()) continue;
     let e;
@@ -163,6 +162,22 @@ function fetchedThisSession(payload) {
       continue;
     }
     if (sid !== null && e.session_id !== sid) continue;
+    entries.push(e);
+  }
+  return entries;
+}
+
+/**
+ * Pages actually FETCHED during this session.
+ *
+ * The window is the session, not the turn — deliberately unlike the evidence
+ * gate. A verdict speaks about the current state of the code, so its proof must
+ * be fresh; a paper fetched twenty minutes ago still says what it said. Scoping
+ * sources to the turn would force a re-fetch of every citation at write-up time.
+ */
+function fetchedThisSession(payload) {
+  const found = new Set();
+  for (const e of readEvidenceEntries(payload)) {
     if (e.kind === "source" && e.url) found.add(e.url);
   }
   return found;
@@ -179,13 +194,6 @@ async function readPayload() {
   }
 }
 
-/**
- * Anchor the log to the project root, never to the current directory.
- *
- * Measured in a real run (2026-08-17): agents worked from a subfolder, so the
- * evidence split across three separate files and the gate read the wrong one.
- * A proof written one directory down was invisible from the root.
- */
 /** Windows hands out 8.3 short names, so compare resolved paths, not strings. */
 function samePath(a, b) {
   const norm = (p) => {
@@ -199,6 +207,13 @@ function samePath(a, b) {
   return norm(a) === norm(b);
 }
 
+/**
+ * Anchor the log to the project root, never to the current directory.
+ *
+ * Measured in a real run (2026-08-17): agents worked from a subfolder, so the
+ * evidence split across three separate files and the gate read the wrong one.
+ * A proof written one directory down was invisible from the root.
+ */
 function projectRoot(payload) {
   const start = payload.cwd || process.cwd();
   const home = homedir();
@@ -238,7 +253,7 @@ function log(payload, entry) {
     const line = {
       ...entry,
       ts: new Date().toISOString().slice(0, 19),
-      session_id: payload.session_id ?? null,
+      session_id: payload.session_id,
     };
     const path = evidencePath(payload);
     mkdirSync(dirname(path), { recursive: true });
@@ -256,23 +271,8 @@ function log(payload, entry) {
  * entries, written on every pass of the Stop hook.
  */
 function verificationsThisTurn(payload) {
-  const sid = payload.session_id ?? null;
   let found = [];
-  let raw;
-  try {
-    raw = readFileSync(evidencePath(payload), "utf8");
-  } catch {
-    return found;
-  }
-  for (const line of raw.split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    let e;
-    try {
-      e = JSON.parse(line);
-    } catch {
-      continue;
-    }
-    if (sid !== null && e.session_id !== sid) continue;
+  for (const e of readEvidenceEntries(payload)) {
     if (e.kind === "turn_end") found = []; // new turn: start over
     else if (e.kind === "evidence" && e.command && VERIFY_RE.test(e.command)) {
       found.push(e.command);
@@ -309,6 +309,29 @@ function onEvidence(payload) {
 }
 
 /**
+ * Did the retrieval actually fail?
+ *
+ * Deliberately CONSERVATIVE: only structured signals count, never the body text.
+ * A page that merely talks about a 404 must not be treated as a failed fetch,
+ * because the cost is asymmetric — missing a failure lets an agent cite a page
+ * it could not read, while inventing a failure blocks an agent that read it
+ * perfectly well. The second is the worse error, so anything ambiguous is
+ * treated as success.
+ *
+ * `isError` is the field ZCode really sets on a failed tool result, observed on
+ * a Bash result that exited 2 in a real session (2026-08-19).
+ */
+function fetchFailed(resp) {
+  if (!resp || typeof resp !== "object") return false;
+  if (resp.isError === true || resp.is_error === true) return true;
+  if (resp.error) return true;
+  const status = resp.status ?? resp.statusCode ?? resp.status_code;
+  if (typeof status === "number" && status >= 400) return true;
+  if (typeof resp.exit_code === "number" && resp.exit_code !== 0) return true;
+  return false;
+}
+
+/**
  * Traces a page retrieval: the raw material of the citation gate.
  *
  * A fetch counts as a source, a search does not, and that asymmetry IS the gate.
@@ -318,17 +341,21 @@ function onEvidence(payload) {
  * supported by the source they name, and the rate collapses further on
  * open-ended questions (SourceCheckup, Nature Communications 2025).
  *
- * The input shape decides, not the tool name: a fetch carries a `url`, a search
- * carries a `query`. That keeps the handler correct if the matcher is ever
- * widened to another retrieval tool.
+ * The input SHAPE decides, not the tool name: a retrieval carries a `url`, a
+ * search carries a `query`. That is what makes this handler correct across
+ * ZCode's built-in `WebFetch` and Z.AI's `webReader` MCP tool alike — the
+ * latter takes `{ retain_images, url }`, so it is recognised without naming it.
  */
 function onSources(payload) {
   const ti = payload.tool_input;
   if (!ti || typeof ti !== "object") return;
   const url = ti.url ?? ti.URL ?? "";
   if (url) {
+    // A failed retrieval is recorded, but never as a source: a 403 the agent
+    // never read must not be citable. Observed in a real run (2026-08-19): two
+    // pages returned 403 to WebFetch and were logged as sources anyway.
     log(payload, {
-      kind: "source",
+      kind: fetchFailed(payload.tool_response) ? "fetch_failed" : "source",
       tool: payload.tool_name ?? null,
       url: normalizeUrl(url),
       raw_url: String(url).slice(0, 300),
@@ -361,13 +388,13 @@ function citationBlock(missing) {
   const head = missing.length
     ? `${missing.length} cited source(s) were never fetched in this session: ` +
       `${missing.slice(0, 8).join(", ")}. `
-    : "the report cites no source at all, so the signature answers for nothing. ";
+    : "this session retrieved no page at all, so the signature answers for nothing. ";
   return (
     `Citation gate: this turn signs SOURCES: VERIFIED but ${head}` +
     "A search result is not a source: a search returns a snippet selected to " +
     "match your query, so a claim resting on one is a claim about the snippet, " +
-    "not about the document. Open each URL with WebFetch and read it, then cite " +
-    "the exact URL you fetched. " +
+    "not about the document. Open each URL and read it, then cite the exact URL " +
+    "you retrieved. " +
     "If a source cannot be fetched, keep the claim only if you mark it " +
     "explicitly unverified, and drop the signature. The marker is optional; " +
     "signing it without having opened the sources is not."
@@ -375,29 +402,26 @@ function citationBlock(missing) {
 }
 
 /**
- * The two gates. A signature is admissible only if the runtime saw what backs it.
+ * Evaluates both gates without deciding what to do about the result.
+ *
+ * Split out from `onStop` so the verdict can be computed even on a retry, where
+ * blocking is forbidden but staying informed is not.
  *
  * Evidence is evaluated first because it is the stricter claim, and only one
  * block can be emitted per turn. Both are still evaluated when a message carries
  * both signatures: a research report can conclude on code as well as on sources,
  * and each marker answers for its own claim.
  */
-function onStop(payload) {
-  // Already intervened this turn: let it through (ZCode caps at 3 retries).
-  if (payload.stop_hook_active) {
-    log(payload, { kind: "turn_end", note: "after gate retry" });
-    return;
-  }
-
-  const message = String(payload.last_assistant_message ?? "");
+function evaluateGates(payload, message) {
   const closing = { kind: "turn_end" };
 
   if (claimsPass(message)) {
     const proofs = verificationsThisTurn(payload);
     if (!proofs.length) {
-      log(payload, { kind: "gate_block", reason: "PASS without verification command" });
-      emit({ decision: "block", reason: EVIDENCE_BLOCK });
-      return;
+      return {
+        block: { reason: "PASS without verification command", text: EVIDENCE_BLOCK },
+        closing,
+      };
     }
     closing.verified_by = proofs.slice(0, 5);
   }
@@ -406,20 +430,75 @@ function onStop(payload) {
     const cited = citedUrls(message);
     const fetched = fetchedThisSession(payload);
     const missing = cited.filter((u) => !fetched.has(u));
-    // No citation at all is also a block: a signature over an empty set is
-    // vacuous, and would be the cheapest way to disarm this gate.
-    if (!cited.length || missing.length) {
-      log(payload, {
-        kind: "gate_block",
-        reason: cited.length
-          ? "SOURCES: VERIFIED with unfetched citations"
-          : "SOURCES: VERIFIED with no citation",
-        missing: missing.slice(0, 10),
-      });
-      emit({ decision: "block", reason: citationBlock(missing) });
-      return;
+    if (missing.length) {
+      return {
+        block: {
+          reason: "SOURCES: VERIFIED with unfetched citations",
+          missing,
+          text: citationBlock(missing),
+        },
+        closing,
+      };
     }
-    closing.sourced_by = cited.slice(0, 10);
+    /*
+     * A signature citing nothing is refused ONLY when the session retrieved
+     * nothing either.
+     *
+     * Measured on a real run (2026-08-19, LMS BOOSTER): the agent fetched 30
+     * pages, wrote all 30 URLs into report.md — a later audit confirmed 30 cited
+     * for 30 fetched, no gap either way — and then signed in a chat message that
+     * carried none of them. The gate reads the message, not the artifact, so it
+     * blocked a turn whose citations were perfectly backed.
+     *
+     * The rule this fixes: refuse a signature the log CONTRADICTS, never one the
+     * log is merely silent about. Signing with zero retrievals in the whole
+     * session is still a contradiction, so that case keeps blocking.
+     */
+    if (!cited.length && !fetched.size) {
+      return {
+        block: { reason: "SOURCES: VERIFIED with nothing fetched", missing: [], text: citationBlock([]) },
+        closing,
+      };
+    }
+    closing.fetched_this_session = fetched.size;
+    if (cited.length) closing.sourced_by = cited.slice(0, 10);
+  }
+
+  return { block: null, closing };
+}
+
+/** The two gates. A signature is admissible only if the runtime saw what backs it. */
+function onStop(payload) {
+  const { block, closing } = evaluateGates(payload, String(payload.last_assistant_message ?? ""));
+
+  /*
+   * Already intervened this turn: ZCode caps retries, so never block twice.
+   * But stay open-eyed rather than blind. The previous version returned before
+   * evaluating anything, which left a bypassed gate indistinguishable from a
+   * satisfied one in the audit trail — the log said `turn_end` either way.
+   * The turn is still closed here, because turn accounting is what scopes the
+   * evidence gate to the current turn.
+   */
+  if (payload.stop_hook_active) {
+    log(payload, block
+      ? {
+        kind: "turn_end",
+        gate_bypassed: block.reason,
+        missing: (block.missing ?? []).slice(0, 10),
+        note: "retry still non-compliant; not blocked twice, by design",
+      }
+      : { ...closing, note: "compliant after gate retry" });
+    return;
+  }
+
+  if (block) {
+    log(payload, {
+      kind: "gate_block",
+      reason: block.reason,
+      missing: (block.missing ?? []).slice(0, 10),
+    });
+    emit({ decision: "block", reason: block.text });
+    return;
   }
 
   log(payload, closing);
