@@ -109,6 +109,8 @@ Write `report.md` in the run folder:
 - cleanup verification results
 - copy `scope.json` and the session's `.betterzcode/evidence/<session id>.jsonl` into the folder as `evidence.jsonl`
 
+The run's audit trail lives durably in the TARGET project's `.betterzcode/evidence/` — not the plugin's. In it, the `scope_attack_pass` kind marks attack commands the gate saw pass under an armed scope; commands inside dispatched beasts are invisible to hooks by design (their cage is the dispatch gate).
+
 ## Step 8: DISARM AND SIGN
 
 Delete `.betterzcode/security/active_scope.json` — the gate closes.
