@@ -76,7 +76,7 @@ Locks the scope in writing before anything is touched (`scope.json`). Runs recon
 
 ### /betterredteam
 
-The environment gate comes first: test/dev or nothing — the run does not start outside an authorized scope. 🟣 `gate-plan-critic` checks the attack plan against the doctrine before anything is dispatched. The beasts are dispatched attackers that receive target and objective only — the cage (the `PreToolUse` scope gate, Bash-matched attack commands and tagged red-team subagent dispatches via Agent/Task: env ≠ prod, matching session, matching hosts) enforces every constraint, not their own restraint. Impact is proven by sample or by controlled callback. 🟠 `gate-finding-verifier` re-executes each demonstrated impact blind and re-verifies cleanup. The run ends with a detection report per attack family (x detected / y suspicious / z clean).
+The environment gate comes first: test/dev or nothing — the run does not start outside an authorized scope. 🟣 `gate-plan-critic` checks the attack plan against the doctrine before anything is dispatched. The beasts are dispatched attackers that receive target and objective only — the cage (the `PreToolUse` scope gate, token-matched attack commands and tagged red-team subagent dispatches via Agent/Task: env ≠ prod, matching session, matching hosts) enforces every constraint, not their own restraint. Impact is proven by sample or by controlled callback. 🟠 `gate-finding-verifier` re-executes each demonstrated impact blind and re-verifies cleanup. The run ends with a detection report per attack family (x detected / y suspicious / z clean). The cage is a guardrail, not an authorization oracle — hooks see main-session commands and dispatches, not subagent internals, and the agent could write `active_scope.json` itself; it raises the bar mechanically, it does not replace the operator's judgment.
 
 ```
 /betterredteam https://staging.ourapp.io — full chain, we own staging
@@ -91,7 +91,7 @@ You do not have to use any of them. The `SessionStart` hook injects the doctrine
 | **Evidence** | `Stop` | `VERDICT: PASS` without a verification command executed this turn |
 | **Citation** | `Stop` | `SOURCES: VERIFIED` citing a URL never fetched this session (failed fetches never count) |
 | **Findings** | `Stop` | `FINDINGS: VERIFIED` without a verification command this turn |
-| **Scope** | `PreToolUse` | attack commands without an armed test/dev scope (env ≠ prod, matching session, matching hosts — Bash-matched attack commands and tagged red-team subagent dispatches, Agent/Task) |
+| **Scope** | `PreToolUse` | attack commands (token-matched — quotes, wrappers, pipes and `$(…)` cannot hide the tool word) without an armed test/dev scope (env ≠ prod, matching session, matching hosts — and tagged red-team subagent dispatches, Agent/Task) |
 
 ## Who does what
 
