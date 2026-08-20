@@ -10,6 +10,7 @@
  *   node test_gate.mjs path/to/hook.py      # tests any other implementation
  */
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
@@ -577,9 +578,13 @@ check("a blocked attack is logged as kind=scope_block",
   && readFileSync(evidenceFile(), "utf8").includes('"kind":"scope_block"'));
 
 // and a scoped pass is logged as scope_pass
+// UPDATED 2026-08-20 (v1.9.5 semantic change, plan step 3): attack commands under
+// an armed scope now log kind=scope_attack_pass (asserted in 25.3). This legacy
+// assertion keeps its original intent — a scoped NON-attack command logs
+// scope_pass — by scoping `ls -la` instead of a nuclei command.
 reset();
 writeScope({ targets: ["staging.example.com"], env: "staging", session_id: SID, created: "2026-08-19T00:00:00Z" });
-scopeCmd("nuclei -u https://staging.example.com");
+scopeCmd("ls -la");
 check("a scoped pass is logged as kind=scope_pass",
   readFileSync(evidenceFile(), "utf8").includes('"kind":"scope_pass"'));
 
@@ -864,6 +869,108 @@ check("24.6 target example.com:443 + https://example.com:8443/x -> BLOCKS (no wi
 writeScope({ targets: ["example.com"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
 check("portless target still matches a ported URL host",
   scopeCmd("curl -s https://example.com:8443/x") === "");
+
+// ---------------------------------------------------------------------------
+// 25. TOKEN-MATCHED SCOPE GATE (v1.9.5)
+// Incident 2026-08-19, smoke test sess_1ba6b6da: `grep nuclei README.md` was
+// BLOCKED by the old substring ATTACK_RE. The gate now matches attack tools on
+// typed command words (vendored shell-quote parse.js): quotes, assignment
+// prefixes, wrappers, interpreters, pipes and $(...) cannot hide the tool word,
+// and a tool name that is merely an ARGUMENT no longer trips the gate.
+// Fallback: any parse exception reverts to the legacy substring match
+// (fail-closed robustness contract).
+// ---------------------------------------------------------------------------
+
+const ATTACK = "nuclei -u https://x.example.com";
+const armScope = () =>
+  writeScope({ targets: ["x.example.com"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+
+// 25.1 THE INCIDENT: `nuclei` as an argument is not an attack
+reset();
+check("25.1 'grep nuclei README.md' with NO scope -> PASSES  (the 2026-08-19 incident, sess_1ba6b6da)",
+  scopeCmd("grep nuclei README.md") === "");
+
+// 25.2 the tool as the command word still fails closed
+reset();
+check("25.2 'nuclei -u https://x.example.com' with NO scope -> BLOCKS",
+  blocked(scopeCmd(ATTACK)));
+
+// 25.3 armed scope: the attack passes AND is observably an attack
+reset();
+armScope();
+check("25.3 armed scope + attack -> passes",
+  scopeCmd(ATTACK) === "");
+check("25.3 ...and is logged as kind=scope_attack_pass  (the LMS BOOSTER ghost, resolved)",
+  existsSync(evidenceFile())
+  && readFileSync(evidenceFile(), "utf8").includes('"kind":"scope_attack_pass"'));
+
+// 25.4 an ordinary command under the same armed scope is a plain scope_pass
+reset();
+armScope();
+scopeCmd("ls -la");
+check("25.4 ordinary command under armed scope -> kind=scope_pass (not attack)",
+  readFileSync(evidenceFile(), "utf8").includes('"kind":"scope_pass"')
+  && !readFileSync(evidenceFile(), "utf8").includes('"kind":"scope_attack_pass"'));
+
+// 25.5-25.14 hiding the tool word: everything still blocks (or passes, when
+// the tool word is only an argument)
+reset();
+check("25.5 'FOO=1 nuclei -u ...' -> BLOCKS  (assignment prefix skipped)",
+  blocked(scopeCmd(`FOO=1 ${ATTACK}`)));
+check("25.6 'sudo nuclei ...' -> BLOCKS  (POSIX wrapper unwrapped)",
+  blocked(scopeCmd(`sudo ${ATTACK}`)));
+check("25.7 'env nuclei ...' -> BLOCKS  (POSIX wrapper unwrapped)",
+  blocked(scopeCmd(`env ${ATTACK}`)));
+check("25.8 '/usr/bin/nuclei -u ...' -> BLOCKS  (basename comparison)",
+  blocked(scopeCmd("/usr/bin/nuclei -u https://x.example.com")));
+check("25.9 \"bash -c 'nuclei -u ...'\" -> BLOCKS  (interpreter, single quotes)",
+  blocked(scopeCmd(`bash -c '${ATTACK}'`)));
+check("25.10 'sh -c \"nuclei ...\"' -> BLOCKS  (interpreter, double quotes)",
+  blocked(scopeCmd(`sh -c "${ATTACK}"`)));
+check("25.11 'echo x | nuclei -u ...' -> BLOCKS  (pipe segment head)",
+  blocked(scopeCmd(`echo x | ${ATTACK}`)));
+check("25.12 'cat file | grep nuclei' -> PASSES  (argument, not a command word)",
+  scopeCmd("cat file | grep nuclei") === "");
+check("25.13 'echo $(nuclei -u ...)' -> BLOCKS  ($( ) op-split, GuardFall classes B/C)",
+  blocked(scopeCmd(`echo $(${ATTACK})`)));
+check("25.14 'nucl\"ei\" -u https://x.example.com' -> BLOCKS  (GuardFall class A: parse pre-joins the quoted word)",
+  blocked(scopeCmd('nucl"ei" -u https://x.example.com')));
+
+// 25.15-25.18 Windows wrappers and non-command nodes
+check("25.15 'powershell -Command \"nuclei ...\"' -> BLOCKS  (payload arrives as ONE token, re-parsed)",
+  blocked(scopeCmd(`powershell -Command "${ATTACK}"`)));
+check("25.16 'cmd /c nuclei -u ...' -> BLOCKS  (Windows wrapper)",
+  blocked(scopeCmd(`cmd /c ${ATTACK}`)));
+check("25.17 'nuclei ${' -> BLOCKS  (parse throws 'Bad substitution' -> legacy fallback, fail-closed; an unbalanced QUOTE does not throw — it is swallowed silently, so it cannot exercise the fallback)",
+  blocked(scopeCmd("nuclei ${")));
+check("25.18 '# nuclei -u https://x.example.com' -> PASSES  (comment node, never a command)",
+  scopeCmd(`# ${ATTACK}`) === "");
+
+// 25.19 vendor integrity: the vendored parser is frozen byte-for-byte
+const VENDOR = join(HERE, "betterzcode", "hooks", "vendor", "shell-quote");
+const FROZEN_PARSE_SHA256 = "3ba508957858163adbcb7602a9af14cbca77cb0e4d1e86e98e396266f1e56523";
+const parseSha = createHash("sha256").update(readFileSync(join(VENDOR, "parse.js"))).digest("hex");
+check("25.19 vendor parse.js sha256 matches the frozen constant (any accidental touch breaks loudly)",
+  parseSha === FROZEN_PARSE_SHA256, `got ${parseSha}`);
+check("25.19 vendor LICENSE retains the MIT grant",
+  readFileSync(join(VENDOR, "LICENSE"), "utf8").includes("MIT"));
+
+// 25.20 wrappers carrying flags (Reviewer A r1 finding, escalated by the
+// orchestrator 2026-08-20): value-bearing flags must not stop the unwrap
+check("25.20 'sudo -u root nuclei ...' -> BLOCKS  (wrapper with a value flag)",
+  blocked(scopeCmd(`sudo -u root ${ATTACK}`)));
+check("25.20 'nice -n 5 nuclei ...' -> BLOCKS  (wrapper with a value flag)",
+  blocked(scopeCmd(`nice -n 5 ${ATTACK}`)));
+check("25.20 'env -u VAR nuclei ...' -> BLOCKS  (wrapper with a value flag)",
+  blocked(scopeCmd(`env -u VAR ${ATTACK}`)));
+
+// 25.21 zero-interference counterweight: the flag fix must not promote
+// arguments to command heads
+reset();
+check("25.21 'sudo -u root grep nuclei README.md' -> PASSES  (grep is the head, nuclei an argument)",
+  scopeCmd("sudo -u root grep nuclei README.md") === "");
+
+deleteScope();
 
 console.log(`\n${"=".repeat(58)}\n${passed} passed, ${failed} failed`);
 rmSync(WS, { recursive: true, force: true });
