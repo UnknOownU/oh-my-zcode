@@ -36,6 +36,14 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { createRequire } from "node:module";
+
+/**
+ * Vendored shell-quote 1.10.0 parser (parse.js, MIT, never patched). Loaded via
+ * createRequire rather than a native import so that an ancestor package.json
+ * flipping .js resolution to ESM cannot break the hook.
+ */
+const sqParse = createRequire(import.meta.url)("./vendor/shell-quote/parse.js");
 
 /** Injected on every session open: keep it short, it is paid for every time. */
 const DOCTRINE =
@@ -105,6 +113,152 @@ const ATTACK_RE = new RegExp(
   ].map((p) => `\\b(?:${p})\\b`).join("|"),
   "i",
 );
+
+/** The same tool names as ATTACK_RE, kept in lockstep as the typed-match list. */
+const ATTACK_TOOLS = new Set([
+  "nuclei", "semgrep", "sqlmap", "nmap", "ffuf", "nikto", "naabu",
+  "subfinder", "katana", "hydra", "zap-baseline", "zap.sh",
+]);
+
+/**
+ * Prefixes that wrap a real command without being it: env assignments,
+ * POSIX niceties, and interpreters whose -c payload must be re-parsed.
+ * Measured against the vendored parser: an interpreter payload arrives as
+ * ONE token (`powershell -Command "nuclei -u x"` → "nuclei -u x" as a single
+ * string), so the payload is re-parsed recursively, not split on spaces.
+ */
+const ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/;
+const WRAPPERS = new Set(["env", "nice", "nohup", "time", "sudo", "command", "stdbuf", "xargs"]);
+/**
+ * Wrapper flags that consume a SEPARATE value token (`sudo -u root nuclei`:
+ * "root" is a value, not the command). 2026-08-20, reviewer finding: skipping
+ * only the bare wrapper word let the flag's VALUE become the command head, so
+ * the attack tool hiding behind `sudo -u root` / `nice -n 5` / `env -u VAR`
+ * was never checked — a fail-open gap in the flagship unwrap. Attached forms
+ * (`-uroot`, `--flag=value`) are self-contained and need no value skip.
+ */
+const WRAPPER_VALUE_FLAGS = {
+  sudo: new Set(["u", "g", "p", "h", "C", "U", "D", "T", "t", "r"]),
+  env: new Set(["u"]),
+  nice: new Set(["n"]),
+  stdbuf: new Set(["o", "e", "i"]),
+  xargs: new Set(["I", "L", "n", "P", "s", "j", "J"]),
+};
+// time / nohup / command keep bare-flag skipping: their flags take no value.
+const INTERPRETERS = new Set(["bash", "sh", "zsh", "dash", "ksh", "powershell", "pwsh", "cmd"]);
+const RUN_FLAG_RE = /^(?:-[a-zA-Z]*c|--command|-Command|-command|\/c|\/C)$/;
+
+/**
+ * The command words of a shell line, typed rather than substring-matched.
+ *
+ * Raw ATTACK_RE.test(command) had a measured false positive (2026-08-19,
+ * `grep nuclei README.md` blocked): the tool name as an ARGUMENT is not an
+ * attack. This walks the parsed token stream instead:
+ *   - sqParse without env: undefined $VAR → "", and `$(…)` degrades to
+ *     op-split segments — every {op} token INCLUDING ( and ) starts a new
+ *     segment, so `echo $(nuclei -u x)` yields nuclei as a segment head
+ *     (no {command} nodes exist without env execution; none is written).
+ *   - Within a segment, each string entry is one word (parse already joins
+ *     quote-split pieces: `nucl"ei"` arrives as "nuclei"); non-string nodes
+ *     are never stringified — `# nuclei …` parses to [{comment:…}] and
+ *     comments are not commands.
+ *   - Assignment prefixes, wrappers, and interpreters are unwrapped;
+ *     interpreter payloads are re-parsed recursively. PowerShell/cmd are not
+ *     POSIX grammars, but detection is by tool NAME — the same word in both.
+ *
+ * @param {string} command
+ * @returns {string[]} every candidate command word (segment and unwrapped heads)
+ */
+function commandWords(command) {
+  const tokens = sqParse(command);
+  if (!Array.isArray(tokens)) return [];
+  // Split on every {op} token, parentheses included: pipes, &&, ;, $( all
+  // demote what follows to a fresh command position.
+  const segments = [[]];
+  for (const t of tokens) {
+    if (t !== null && typeof t === "object" && typeof t.op === "string") segments.push([]);
+    else segments[segments.length - 1].push(t);
+  }
+  const words = [];
+  for (const segment of segments) {
+    // Words: every string entry is one word (parse has already joined the
+    // pieces a quote split, measured: `nucl"ei"` arrives as "nuclei").
+    // Non-string nodes are NEVER stringified — a comment node is not a
+    // command (`# nuclei …` parses to [{comment:…}] and must stay inert).
+    const segWords = segment.filter((t) => typeof t === "string" && t !== "");
+    if (!segWords.length) continue;
+    words.push(...unwrapHead(segWords, 0));
+  }
+  return words;
+}
+
+/**
+ * Walk a segment from position i, unwrapping assignments/wrappers/interpreters
+ * into the accumulator; an interpreter's payload token is re-parsed via
+ * commandWords (recursive by design: one nesting level per wrapper).
+ */
+function unwrapHead(segWords, i) {
+  const out = [];
+  while (i < segWords.length) {
+    const w = segWords[i];
+    if (ASSIGNMENT_RE.test(w)) { i++; continue; } // FOO=1 nuclei → skip prefix
+    const lower = w.toLowerCase();
+    if (WRAPPERS.has(lower)) {
+      // 2026-08-20, reviewer finding: the wrapper's own flags (and the VALUE
+      // some of them take) are not the command. Skip every "-…" token after
+      // the wrapper; a short flag in WRAPPER_VALUE_FLAGS (exact `-u` form)
+      // also skips its separate value token, a long `--flag` likewise; the
+      // attached forms (`-uroot`, `--flag=value`) are self-contained. The
+      // first non-flag token is the real head.
+      i++;
+      while (i < segWords.length && segWords[i].startsWith("-")) {
+        const flag = segWords[i];
+        // A value-taking flag consumes the NEXT token when its value is
+        // separate: exact short form (`-u`) or bare long form (`--user`).
+        // Attached forms (`-uroot`, `--user=root`) carry it inline.
+        const takesValue = flag.includes("=")
+          ? false
+          : flag.startsWith("--")
+            ? true
+            : WRAPPER_VALUE_FLAGS[lower]?.has(flag.slice(1)) ?? false;
+        i += takesValue ? 2 : 1;
+      }
+      continue;
+    }
+    if (INTERPRETERS.has(lower) && i + 1 < segWords.length && RUN_FLAG_RE.test(segWords[i + 1])) {
+      // bash -c 'payload' / powershell -Command "payload" / cmd /c payload.
+      // When the payload came quoted it is one token — re-parse it whole.
+      for (let j = i + 2; j < segWords.length; j++) {
+        if (typeof segWords[j] === "string" && segWords[j].includes(" ")) {
+          out.push(...commandWords(segWords[j]));
+        }
+      }
+      // Unquoted payloads: the words after the flag are the command already.
+      out.push(...unwrapHead(segWords, i + 2));
+      return out;
+    }
+    out.push(w); // a real command head
+    return out;
+  }
+  return out;
+}
+
+/**
+ * Typed attack matching: exact case-insensitive equality on the basename of a
+ * command word against ATTACK_TOOLS. The whole parse+match is wrapped: ANY
+ * exception (measured input that throws: `nuclei ${` → "Bad substitution")
+ * falls back to the legacy ATTACK_RE on the raw string — an unparseable
+ * command is broken anyway, so fail-closed is the assumed posture. This keeps
+ * the robustness contract: a parser defect can never break a session.
+ */
+function attackIn(command) {
+  try {
+    return commandWords(command)
+      .some((w) => ATTACK_TOOLS.has(w.split("/").pop().toLowerCase()));
+  } catch {
+    return ATTACK_RE.test(command);
+  }
+}
 
 /** A local copy of the URL pattern: the shared one is /g and stateful. */
 const SCOPE_URL_RE = /https?:\/\/[^\s<>()[\]"'`]+/gi;
@@ -766,7 +920,7 @@ function onScope(payload) {
   const command = ti && typeof ti === "object" ? String(ti.command ?? "") : "";
   if (!command) return;
   const head = command.slice(0, 200);
-  const isAttack = ATTACK_RE.test(command);
+  const isAttack = attackIn(command);
   const scope = readScopeFile(payload);
 
   // 1. No session id: not a real turn. Attack tools still fail closed —
@@ -820,7 +974,13 @@ function onScope(payload) {
         return;
       }
     }
-    log(payload, { kind: "scope_pass", command: head });
+    // 2026-08-20: the audit trail must distinguish "the gate SAW an attack
+    // command pass under an armed scope" (scope_attack_pass) from plain
+    // scoped traffic (scope_pass). Resolution of the LMS BOOSTER ghost
+    // scope_pass: the run's real evidence lives in the TARGET project's
+    // .betterzcode/evidence/, and subagent commands are invisible to hooks
+    // by design — this kind is what makes the difference auditable.
+    log(payload, { kind: isAttack ? "scope_attack_pass" : "scope_pass", command: head });
     return;
   }
 
