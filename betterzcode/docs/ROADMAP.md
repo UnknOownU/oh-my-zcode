@@ -14,12 +14,12 @@
 
 **1.9.x (polish).** Known edges from the v1.9.1 run report: IPv6 target support, and the `exp/` raw-data gap (docs/routing.md references an `exp/` folder of raw measurement data that was never committed).
 
-**2.0.0 — the MCP release (RESERVED).** The plugin ships its own MCP server: a scope service (`get_scope` / `authorize` / `revoke`), mechanical disarm via `updatedInput` on PreToolUse, and a `userConfig` settings panel — the settings become real knobs because MCP declarations are where ZCode substitutes `${user_config.key}`. All doc-backed (research 20260819-1927, `.betterzcode/research/20260819-1927_zcode-capabilities-validation_0848e5b7/report.md`).
+**2.0.0 — the MCP release — shipped 2026-08-21.** The plugin ships its own MCP scope server (stdio, zero dependency): `get_scope` (read-only) and `revoke`, arming moved to Settings (`userConfig`: `scope_targets`, `scope_env`, `scope_max_age_min` — the settings become real knobs because MCP declarations are where ZCode substitutes `${user_config.key}`), automatic expiry windows replacing session binding, and mechanical disarm via `updatedInput` on PreToolUse (mixed-URL commands get out-of-scope tokens removed). Renamed to `oh-my-zcode` — **breaking**: uninstall `betterzcode` first; a 1.9.5 scope left armed mid-run is disarmed at the first v2 server start. **Documented deviation**: no `authorize` tool — `PermissionRequest` cannot distinguish a user call from an agent call, so an agent-callable `authorize` would be self-armable; the earlier promise of `authorize` in this roadmap is amended here — arming is Settings-only, by construction. All doc-backed (research 20260819-1927, `.betterzcode/research/20260819-1927_zcode-capabilities-validation_0848e5b7/report.md`).
 
 ---
 
 ## Notes
 
 - The GitHub repository is [`UnknOownU/oh-my-zcode`](https://github.com/UnknOownU/oh-my-zcode) (private).
-- Renaming the plugin to "oh-my-zcode" is a **candidate for 2.0** — an option, not a promise.
+- The rename to "oh-my-zcode" **shipped with 2.0.0** (2026-08-21): installs must uninstall `betterzcode` and install `oh-my-zcode`.
 - **Re-measure max-vs-high for judging roles before 2.0.** The latency justification for `high` was retired with the invalid script; the routing decision stays `high` until re-measured, not because the old figure still holds.

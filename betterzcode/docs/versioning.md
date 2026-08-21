@@ -1,6 +1,6 @@
 # Versioning — the policy
 
-> **Decision**: owner, 2026-08-19. The plugin lives in the **1.x** line; **2.0.0 is reserved for the MCP release** — the era where the plugin ships its own MCP server (scope service, mechanical disarm, settings panel). Nothing between now and that release may claim 2.x.
+> **Decision**: owner, 2026-08-19. The plugin lives in the **1.x** line; **2.0.0 is reserved for the MCP release** — the era where the plugin ships its own MCP server (scope service, mechanical disarm, settings panel). Nothing between now and that release may claim 2.x. **Fulfilled 2026-08-21**: the 2.0.0 reservation is taken by the MCP release (`oh-my-zcode`).
 
 ---
 
