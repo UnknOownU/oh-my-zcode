@@ -7,10 +7,10 @@
   },
   "plugins": [
     {
-      "name": "betterzcode",
+      "name": "oh-my-zcode",
       "source": "./betterzcode",
       "description": "Your agent cannot call a task done without proving it, and cannot cite a source it never opened. Separate agents check the plan, write the code, review it and verify it by execution; hooks block any success verdict no executed test supports, any report citing a page that was never fetched, and in security runs a finding enters the report only once independently reproduced — the hooks block a FINDINGS: VERIFIED signature when no verification command ran, and a red-team impact mode whose attack commands a PreToolUse gate physically blocks until a test/dev scope is authorized.",
-      "version": "1.9.5",
+      "version": "2.0.0",
       "category": "Developer Tools",
       "tags": ["code-review", "qa", "multi-agent", "glm", "verification", "research", "citations", "security", "pentest", "red-team", "impact"]
     }
