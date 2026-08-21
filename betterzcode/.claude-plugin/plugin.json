@@ -31,30 +31,25 @@
       "command": "node",
       "args": [
         "${ZCODE_PLUGIN_ROOT}/mcp/scope-server.mjs"
-      ],
-      "env": {
-        "SCOPE_TARGETS": "${user_config.scope_targets}",
-        "SCOPE_ENV": "${user_config.scope_env}",
-        "SCOPE_MAX_AGE_MIN": "${user_config.scope_max_age_min}"
-      }
-    }
-  },
-  "userConfig": {
-    "scope_targets": {
-      "type": "string",
-      "title": "Scope targets (comma-separated hosts)",
-      "description": "Hosts the security scope covers, e.g. x.example.com,y.example.com"
+      ]
     },
-    "scope_env": {
-      "type": "string",
-      "title": "Scope environment (dev|staging|test)",
-      "description": "Environment of the scoped targets. prod or any other value leaves the scope unarmed (fail-closed)."
+    "semgrep": {
+      "type": "stdio",
+      "command": "semgrep",
+      "args": [
+        "mcp"
+      ]
     },
-    "scope_max_age_min": {
-      "type": "string",
-      "title": "Scope window (minutes)",
-      "description": "Lifetime of an armed scope in minutes. The window opens when the config is saved and expires automatically.",
-      "default": "60"
+    "osv-scanner": {
+      "type": "stdio",
+      "command": "osv-scanner",
+      "args": [
+        "experimental-mcp"
+      ]
+    },
+    "grep": {
+      "type": "http",
+      "url": "https://mcp.grep.app"
     }
   }
 }
