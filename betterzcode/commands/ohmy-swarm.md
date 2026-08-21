@@ -3,7 +3,7 @@ description: Runs the full pipeline on a task - plan checked, code written, revi
 argument-hint: "[task description]"
 ---
 
-# /betterswarm: Plan Critic -> Builder -> Reviewer -> Verifier
+# /ohmy-swarm: Plan Critic -> Builder -> Reviewer -> Verifier
 
 Requested task: **$ARGUMENTS**
 
@@ -24,9 +24,9 @@ Then split it into **independent areas** (an area is a file scope that does not 
 
 Once the areas are defined, you have a plan. Do not execute it yet.
 
-**If the user already ran `/betterplan` and hands you a validated plan, skip this step** and go to step 1: it has been checked already.
+**If the user already ran `/ohmy-plan` and hands you a validated plan, skip this step** and go to step 1: it has been checked already.
 
-Otherwise delegate to `gate-plan-critic`. Pass it the four parts and the planned steps. It checks against the codebase: do the referenced files exist, is the step order workable, is a precondition missing, is the success criterion testable, was anything dropped.
+Otherwise delegate to `ohmy-plan-critic`. Pass it the four parts and the planned steps. It checks against the codebase: do the referenced files exist, is the step order workable, is a precondition missing, is the success criterion testable, was anything dropped.
 
 If it returns `PLAN REVISE`: fix the plan with its concrete fixes, then send it back. **Three rounds maximum** — the budget ceiling and the escalation point, not a target (the 96.5%-by-3 figure comes from embodied-AI plans, arXiv 2509.02761; no measured constant exists for code planning); after that, surface the remaining problems to the user and let them decide.
 
@@ -36,7 +36,7 @@ Skip this step only for a change confined to a single file with an obvious crite
 
 ## Step 1: BUILDER (per area)
 
-Delegate to `gate-builder`. Pass the four parts, the area's file scope, and nothing else.
+Delegate to `ohmy-builder`. Pass the four parts, the area's file scope, and nothing else.
 
 Wait for its report: ARTIFACT / CHECKS PERFORMED / WHAT I DID NOT VERIFY / CONFIDENCE / FOR THE REVIEWER.
 
@@ -44,7 +44,7 @@ Wait for its report: ARTIFACT / CHECKS PERFORMED / WHAT I DID NOT VERIFY / CONFI
 
 ## Step 2: REVIEWER (fresh context)
 
-Delegate to `gate-reviewer`. **Never pass it the Builder's reasoning**, only:
+Delegate to `ohmy-reviewer`. **Never pass it the Builder's reasoning**, only:
 1. the original specification (the four parts)
 2. the artifact: the diff or the modified files
 3. the specification repeated in full at the end of the message
@@ -55,7 +55,7 @@ If the verdict is FAIL: send the findings back to the Builder (step 1) without c
 
 ## Step 3: VERIFIER (execution evidence)
 
-Delegate to `gate-verifier` only after a `VERDICT: PASS` from the Reviewer.
+Delegate to `ohmy-verifier` only after a `VERDICT: PASS` from the Reviewer.
 
 Its signature is admissible only if it quotes command outputs actually obtained. A signature without a command output is void: send it back.
 
@@ -76,7 +76,7 @@ Retries past the first cycle are cheap only in appearance: each full cycle here 
 
 ## Step 5: Write the run report
 
-At the **project root**, in `.betterzcode/plans/<YYYYMMDD-HHMM>_<slug>_<session8>/` (reuse the folder if `/betterplan` already created one), write `report.md`:
+At the **project root**, in `.betterzcode/plans/<YYYYMMDD-HHMM>_<slug>_<session8>/` (reuse the folder if `/ohmy-plan` already created one), write `report.md`:
 
 ```markdown
 # Run report - <Goal>

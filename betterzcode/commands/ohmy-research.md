@@ -3,11 +3,11 @@ description: Researches a question against real sources, has every claim confron
 argument-hint: "[the question you want answered]"
 ---
 
-# /betterresearch: a report whose citations you can trust
+# /ohmy-research: a report whose citations you can trust
 
 Question: **$ARGUMENTS**
 
-You lead the research. You do not believe a source you have not opened, and you do not sign for someone else's reading.
+You are the orchestrator. **You never write the report** — a dedicated draft writer produces it from the notes — but you lead the research, you do not believe a source you have not opened, and you do not sign for someone else's reading. The signature stays yours and it is earned in this session.
 
 ## Why this command exists
 
@@ -58,59 +58,34 @@ If an axis discovers that a premise is false, a path is a dead end, or a constra
 
 The asymmetry is deliberate: a false refutation costs one abandoned path, a false premise costs the entire report.
 
-## Step 4: Confront the claims with their sources
+## Step 4: Dispatch `ohmy-draft-writer`
 
-Delegate to `gate-source-verifier`. Pass it the draft and nothing else — it opens every source itself, because the draft's summary of a source is exactly what it was called to check.
+At the **project root**, create `.betterzcode/research/<YYYYMMDD-HHMM>_<slug>_<session8>/` (where `<slug>` is three or four words from the Question and `<session8>` is the first 8 characters of the session id). Then delegate to `ohmy-draft-writer`: pass it the folder path, the four framing parts, and the axes' notes — each claim with its source URL and a verbatim quote. It writes `report.md` there and answers with ARTIFACT / CONFIDENCE.
+
+**You never write or edit the report yourself.** If the draft is wrong, that is a finding for the verifier (step 5) or a new draft-writer dispatch with the corrections to apply.
+
+## Step 5: Confront the claims with their sources
+
+Delegate to `ohmy-source-verifier`. Pass it the draft and nothing else — it opens every source itself, because the draft's summary of a source is exactly what it was called to check.
 
 It answers per claim: `SUPPORTED`, `NARROWER`, `UNSUPPORTED`, `UNVERIFIABLE`, each with a verbatim quote, and proposes corrected wording rather than deletion.
 
-- `CITATIONS REVISE` → apply its corrections, then send it back. **Three rounds maximum.**
-- `CITATIONS CLEAN` → go to step 5.
+- `CITATIONS REVISE` → dispatch a NEW `ohmy-draft-writer` with the corrections to apply to the file, then send it back. **Three rounds maximum.**
+- `CITATIONS CLEAN` → go to step 6.
 
 **Most defects here are scope drift, not invention.** A figure averaged over one model family, reported without that qualifier, is wrong in the way that survives review: the number is real, the claim is not.
 
-## Step 5: Open the sources yourself before you sign
+## Step 6: Open the sources YOURSELF before you sign
 
 **ZCode hooks do not fire inside a subagent.** The pages the verifier fetched are invisible from this session, so its reading cannot back your signature — the same rule that governs the code pipeline, for the same reason.
 
-So: fetch every source you cite in the final report, here, in this session. Then cite the exact URL you fetched.
+So: **fetch every source you cite in the final report yourself, here, in this session.** Then cite the exact URL you fetched.
 
 This is not bureaucracy. It is the difference between "an agent told me it read the paper" and "the paper was retrieved". Only the second one is a fact about the world.
 
-## Step 6: Write the report
+**This rule is yours and it is non-delegable.** No writer, no verifier, no subagent can open the sources on your behalf: the orchestrator signs only on pages this session retrieved.
 
-At the **project root**, in `.betterzcode/research/<YYYYMMDD-HHMM>_<slug>_<session8>/`, write `report.md`:
-
-```markdown
-# <Question in one line>
-
-- **Session**: <full session id>
-- **Finished**: <ISO timestamp>
-
-## Question / Scope / Constraints / Answered when
-...
-
-## Answer
-<the answer, first. Not the method, not the journey.>
-
-## Findings
-### <Axis 1>
-<claim> — <source URL>
-> <the verbatim sentence that carries it>
-
-## What the source verifier caught
-- <claim> — <verdict> -> <what changed>
-
-## Unanswered
-<what the run did not settle, and what would settle it>
-
-## Sources opened
-<one line per URL actually fetched>
-```
-
-Then copy `.betterzcode/evidence/<session id>.jsonl` into the same folder as `evidence.jsonl`. The original stays where it is.
-
-**"Unanswered" is a required section, not a courtesy.** The best research agents recover 42.5% of the relevant material on an encyclopedic corpus and 29.2% on a technical one, and cannot estimate that gap themselves. A report with no stated gap is claiming a completeness nobody has measured.
+Then copy `.betterzcode/evidence/<session id>.jsonl` into the report folder as `evidence.jsonl`. The original stays where it is.
 
 ## Step 7: Sign
 
@@ -122,13 +97,14 @@ SOURCES: VERIFIED
 
 The citation gate then checks every URL you cited against the pages this session actually fetched, and refuses the turn if one is missing.
 
-**The signature is optional. Signing it without having opened the sources is not.** If a source could not be retrieved, keep the claim only if you mark it explicitly unverified in the report, and do not sign.
+**The signature is optional. Signing it without having opened the sources is not.** If a source could not be retrieved, keep the claim only if it is marked explicitly unverified in the report, and do not sign.
 
 ## Hard rules
 
 1. **A search result is never a source.** Only a fetched page enters the notes.
 2. **No claim without a verbatim quote.** If you cannot quote the sentence, you do not have the finding.
-3. **Whoever publishes opens the sources.** A subagent's reading cannot sign your report.
-4. **Three axes, three agents, ceiling.** Below roughly 45% single-agent performance a second agent helps; above it the gain is measured at zero or negative, and homogeneous agents duplicate each other rather than adding coverage.
-5. **Do not try to buy model diversity here.** On the Coding Plan, `glm-5.2`, `glm-5.1` and `glm-5` are aliases answering as `glm-5.3`, and `glm-4.5-air` answers as `glm-4.7`. Running "different models" would give you the same model under three names, and correlated errors are exactly what a second reader is supposed to remove. The agent ceiling therefore binds harder here than the literature suggests.
-6. **The gap is part of the answer.** An unanswered sub-question stated plainly is worth more than a confident paragraph nobody can check.
+3. **Whoever publishes opens the sources.** A subagent's reading cannot sign your report — and you never sign on pages you did not fetch yourself.
+4. **The orchestrator never writes the report.** The draft is produced by `ohmy-draft-writer`; corrections are routed back to a new writer dispatch, never applied by hand.
+5. **Three axes, three agents, ceiling.** Below roughly 45% single-agent performance a second agent helps; above it the gain is measured at zero or negative, and homogeneous agents duplicate each other rather than adding coverage.
+6. **Do not try to buy model diversity here.** On the Coding Plan, `glm-5.2`, `glm-5.1` and `glm-5` are aliases answering as `glm-5.3`, and `glm-4.5-air` answers as `glm-4.7`. Running "different models" would give you the same model under three names, and correlated errors are exactly what a second reader is supposed to remove. The agent ceiling therefore binds harder here than the literature suggests.
+7. **The gap is part of the answer.** An unanswered sub-question stated plainly is worth more than a confident paragraph nobody can check.

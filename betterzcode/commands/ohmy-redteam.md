@@ -4,7 +4,7 @@ argument-hint: "[target URL]"
 skills: security-gate
 ---
 
-# /betterredteam: what an attacker actually takes
+# /ohmy-redteam: what an attacker actually takes
 
 Requested target: **$ARGUMENTS**
 
@@ -12,7 +12,7 @@ You are the orchestrator. You never attack yourself: blind attacker agents chain
 
 ## Why this command exists
 
-/bettersecurity answers "is it closed". This command answers "if it opens, what does an attacker take". Impact over inventory: single findings matter less than full chains — foothold, escalation, data — and the report grades the defenses, not just the holes.
+/ohmy-security answers "is it closed". This command answers "if it opens, what does an attacker take". Impact over inventory: single findings matter less than full chains — foothold, escalation, data — and the report grades the defenses, not just the holes.
 
 ## Step 0: ENVIRONMENT GATE
 
@@ -23,27 +23,41 @@ You are the orchestrator. You never attack yourself: blind attacker agents chain
 Three outcomes only:
 
 1. User confirms the target is test/dev/staging -> continue.
-2. User says it is production -> **REFUSE active mode entirely.** Offer `/bettersecurity code` (SAST on the local repo) instead. Do NOT write any scope file.
+2. User says it is production -> **REFUSE active mode entirely.** Offer `/ohmy-security code` (SAST on the local repo) instead. Do NOT write any scope file.
 3. User gives a different target -> restart step 0 with the new target.
 
 No attack request leaves before option 1.
 
-## Step 0.5: ARM THE AUTHORIZATION (user-held)
+## Step 0.5: ARM THE AUTHORIZATION (by invocation)
 
-Since v2 the authorization is NOT written by you — it lives in the Settings, the one write path the agent does not have. Ask the USER to arm it:
+Since v2 the authorization is armed by running this command itself with the target as its argument — the scope file is written once, here, with a 60-minute window, and nothing is armed without it.
 
-1. Settings → Plugins → oh-my-zcode → fill the scope fields:
-   - `scope_targets` — hosts, comma-separated (`localhost, staging.app.io, *.app.io`; full URLs also work)
-   - `scope_env` — `dev`, `staging` or `test`
-   - `scope_max_age_min` — the authorization window in minutes (default 60)
-2. If the plugin was already running, the user re-toggles it once so the MCP scope server restarts and materializes the scope.
-3. Targets contract (identical to the gate's): a host written WITHOUT port authorizes the host on ANY port; a target WITH a port (`localhost:3000`) authorizes ONLY that port, never another.
+**Derive `targets` and `env` from the argument, by rule:**
 
-Then YOU verify — read-only, never write `active_scope.json` yourself: call the `get_scope` tool (the plugin's MCP scope server). It returns the armed state (`targets`, `env`, `granted_at`, `expires_at`) or "no scope armed". Copy the returned state verbatim into the run's frozen record `.betterzcode/security/<YYYYMMDD-HHMM>_<slug>_<session8>/scope.json` (targets, env, window, the user's confirmation quoted verbatim).
+- `localhost`, `127.x.x.x`, `192.168.x.x`, `*.local` -> env `local`
+- `*.staging.*`, `staging.*` -> env `staging`
+- anything else -> **ask the user to confirm the environment explicitly** and continue only on a test/dev/staging answer
+- env `prod` -> **REFUSE the run.** No scope file is written, no attack happens.
 
-If `get_scope` answers "no scope armed": the user has not armed it (or the window closed) — stop and ask; do not proceed, do not work around.
+**Then WRITE the scope file yourself**, at the project root's `.betterzcode/security/active_scope.json`:
 
-State to the user: the scope gate now enforces this mechanically — attack commands outside this scope, or after the window expires, are blocked.
+```json
+{
+  "targets": ["<host(s) derived from the argument>"],
+  "env": "<local|staging|test|dev>",
+  "granted_at": "<ISO now>",
+  "expires_at": "<ISO now + 60 minutes>",
+  "source": "invocation"
+}
+```
+
+Targets contract (identical to the gate's): a host written WITHOUT port authorizes the host on ANY port; a target WITH a port (`localhost:3000`) authorizes ONLY that port, never another.
+
+Then verify: call the `get_scope` tool (the plugin's MCP scope server). It returns the armed state (`targets`, `env`, `granted_at`, `expires_at`) or "no scope armed". Copy the returned state verbatim into the run's frozen record `.betterzcode/security/<YYYYMMDD-HHMM>_<slug>_<session8>/scope.json` (targets, env, window, the derivation rule and the user's confirmation quoted verbatim).
+
+If `get_scope` answers "no scope armed": the window may have closed or the file was not written where the gate reads it — stop and resolve; do not proceed, do not work around.
+
+State to the user: the scope gate now enforces this mechanically — attack commands outside this scope, or after the 60-minute window expires, are blocked.
 
 ## Step 0.6: PREFLIGHT
 
@@ -59,7 +73,7 @@ Restate the run in four parts: Goal, Context, Constraints, Done-when. The Done-w
 
 ## Step 2: PLAN
 
-Build the attack plan by WSTG family. Delegate to `gate-plan-critic` (three rounds maximum). It answers `PLAN READY` or `PLAN REVISE` — that vocabulary only; never ask it for a VERDICT.
+Build the attack plan by WSTG family. Delegate to `ohmy-plan-critic` (three rounds maximum). It answers `PLAN READY` or `PLAN REVISE` — that vocabulary only; never ask it for a VERDICT.
 
 ## Step 3: RECON
 
@@ -78,7 +92,7 @@ Dispatch attacker subagents (inline, `glm-5.3`, generous maxTurns). Each beast r
 - the optional callback URL for impact proofs
 - relevant `sec-*` skill names, if present
 
-Every beast dispatch prompt STARTS with the line `[betterredteam <run-id>]` — an inert routing label the scope gate reads to route the dispatch itself. It is NOT a rule: the beast stays blind, the cage enforces.
+Every beast dispatch prompt STARTS with the line `[ohmy-redteam <run-id>]` — an inert routing label the scope gate reads to route the dispatch itself. It is NOT a rule: the beast stays blind, the cage enforces.
 
 NO rule lists. NO ethics paragraphs. NO prohibited-actions text in the beast prompt — the cage (the scope gate) enforces. And the cage now covers the dispatch itself, not just Bash commands: a tagged dispatch without an armed scope is blocked mechanically.
 
@@ -95,7 +109,7 @@ A refusal is a FAILURE: re-dispatch with adjusted framing, never record it as "n
 
 ## Step 5: FINDING-VERIFIER
 
-Delegate ALL proofs to `gate-finding-verifier` (it never sees the beasts' reasoning). Ask it ALSO to verify cleanup at the end: every artifact the run declared creating/uploading must be absent — re-executed checks, quoted outputs.
+Delegate ALL proofs to `ohmy-finding-verifier` (it never sees the beasts' reasoning). Ask it ALSO to verify cleanup at the end: every artifact the run declared creating/uploading must be absent — re-executed checks, quoted outputs.
 
 ## Step 6: RUN THE DECIDING COMMANDS YOURSELF
 
@@ -105,7 +119,7 @@ ZCode hooks do not fire in subagents. Before signing anything, re-run in this se
 
 Write `report.md` in the run folder:
 
-- scope as authorized — quote the user's confirmation
+- scope as authorized — quote the derivation rule and the user's confirmation
 - confirmed chains documented as analysis: foothold -> escalation -> data; what could be gleaned, changed, removed
 - impact per chain, by SAMPLE (max 3 records or a schema) or by callback (the listener's receipt) — never more
 - DETECTION REPORT per family: x launched / y blocked / z logged — from WAF pages, 403s, rate-limit responses observed in raw outputs
@@ -117,7 +131,7 @@ The run's audit trail lives durably in the TARGET project's `.betterzcode/eviden
 
 ## Step 8: DISARM AND SIGN
 
-Disarm by calling the `revoke` tool (the MCP scope server removes the armed scope — the gate closes immediately). The user can also clear the Settings scope fields, which prevents any re-arm on the next server restart. Never rewrite `active_scope.json` by hand.
+Disarm by calling the `revoke` tool (the MCP scope server deletes the armed scope — the gate closes immediately). If the run simply ends without a revoke, the window expires on its own after 60 minutes. Never rewrite `active_scope.json` by hand.
 
 Then optionally end the final message with, alone on the last line:
 

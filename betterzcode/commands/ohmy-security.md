@@ -4,7 +4,7 @@ argument-hint: "[target URL | 'code' for SAST on the local repo]"
 skills: security-gate
 ---
 
-# /bettersecurity: an assessment whose findings were actually reproduced
+# /ohmy-security: an assessment whose findings were actually reproduced
 
 Requested target: **$ARGUMENTS**
 
@@ -35,7 +35,7 @@ Restate the run in four parts: Goal, Context, Constraints, Done-when. The Done-w
 
 ## Step 2: PLAN
 
-Build the attack plan by WSTG angle families. Delegate to `gate-plan-critic` (three rounds maximum). It answers `PLAN READY` or `PLAN REVISE` — that vocabulary only; never ask it for a VERDICT.
+Build the attack plan by WSTG angle families. Delegate to `ohmy-plan-critic` (three rounds maximum). It answers `PLAN READY` or `PLAN REVISE` — that vocabulary only; never ask it for a VERDICT.
 
 ## Step 3: RECON
 
@@ -51,7 +51,7 @@ Interactive command/observe loop, real tools, rate-limited. Each returns **candi
 
 ## Step 5: FINDING-VERIFIER
 
-Delegate the candidates to `gate-finding-verifier` WITHOUT the attacker's reasoning. You get per finding CONFIRMED / NOT REPRODUCED / OUT OF SCOPE, each with the raw output of the re-execution.
+Delegate the candidates to `ohmy-finding-verifier` WITHOUT the attacker's reasoning. You get per finding CONFIRMED / NOT REPRODUCED / OUT OF SCOPE, each with the raw output of the re-execution.
 
 ## Step 6: RUN THE DECIDING COMMANDS YOURSELF
 
