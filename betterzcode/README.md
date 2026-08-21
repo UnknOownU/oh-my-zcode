@@ -96,7 +96,7 @@ You do not have to use any of them. The `SessionStart` hook injects the doctrine
 
 ## The MCP servers
 
-The plugin ships **four** MCP servers, declared in [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) — that manifest is the form the runtime actually registers (the `.zcode-plugin` form was silently ignored in the 2026-08-21 measurements; the directory no longer exists).
+The plugin ships **four** MCP servers, declared in [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) — the form both working precedents (chrome-devtools-mcp, exa) ship. Measured law: the host reads plugin MCP declarations **only at app start** — install or update the plugin, then restart ZCode, or the servers will not appear in the session.
 
 | Server | Transport | What it is |
 |---|---|---|
