@@ -501,13 +501,38 @@ check("marker with ZERO verification commands the whole session -> BLOCKS",
 // ---------------------------------------------------------------------------
 
 const scopeFile = () => join(WS, ".betterzcode", "security", "active_scope.json");
+// UPDATED 2026-08-21 (v2.0.0 model change): fixtures are v2-format
+// {targets, env, granted_at, expires_at, source}. Expiry windows REPLACE the
+// v1.9.5 session binding — authorization is armed by the user in Settings and
+// materialized by the MCP scope server; session_id is gone from the file.
+// Defaults: granted_at = now, expires_at = +60 min (both ISO).
 const writeScope = (s) => {
+  const grantedAt = s.granted_at ?? new Date().toISOString();
+  const expiresAt = s.expires_at
+    ?? new Date(new Date(grantedAt).getTime() + 60 * 60000).toISOString();
   mkdirSync(join(WS, ".betterzcode", "security"), { recursive: true });
-  writeFileSync(scopeFile(), JSON.stringify(s), "utf8");
+  writeFileSync(scopeFile(), JSON.stringify({
+    targets: s.targets,
+    env: s.env,
+    granted_at: grantedAt,
+    expires_at: expiresAt,
+    source: s.source ?? "userConfig",
+  }), "utf8");
 };
+// An EXPIRED window (deterministic past dates, never "now - epsilon") for the
+// fail-closed expiry tests of the v2 model.
+const writeExpiredScope = (s) =>
+  writeScope({ ...s, granted_at: "2019-01-01T00:00:00Z", expires_at: "2020-01-01T00:00:00Z" });
 const deleteScope = () => rmSync(scopeFile(), { force: true });
 const scopeCmd = (command) =>
   run("scope", { tool_name: "Bash", tool_input: { command } });
+const blockReason = (out) => {
+  try {
+    return JSON.parse(out).reason ?? "";
+  } catch {
+    return "";
+  }
+};
 
 // 22.1 attack command, no scope file at all -> fail closed
 reset();
@@ -515,24 +540,28 @@ check("nuclei with NO scope file -> BLOCKS", blocked(scopeCmd("nuclei -l hosts.t
 
 // 22.2 a valid scope authorizes the attack
 reset();
-writeScope({ targets: ["staging.example.com"], env: "staging", session_id: SID, created: "2026-08-19T00:00:00Z" });
+writeScope({ targets: ["staging.example.com"], env: "staging" });
 check("nuclei against the scoped target -> passes (no output)",
   scopeCmd("nuclei -u https://staging.example.com") === "");
 
 // 22.3 prod is never a valid scope
 reset();
-writeScope({ targets: ["staging.example.com"], env: "prod", session_id: SID, created: "2026-08-19T00:00:00Z" });
+writeScope({ targets: ["staging.example.com"], env: "prod" });
 check("scope env 'prod' + attack -> BLOCKS", blocked(scopeCmd("nuclei -u https://staging.example.com")));
 
-// 22.4 a scope from another session does not authorize this one
+// 22.4 UPDATED 2026-08-21 (v2.0.0 model change): session binding is GONE — an
+// expired window is what now fails closed. The old wrong-session fixture
+// encoded the removed model.
 reset();
-writeScope({ targets: ["staging.example.com"], env: "staging", session_id: "sess-someone-else", created: "2026-08-19T00:00:00Z" });
-check("scope bound to ANOTHER session + attack -> BLOCKS",
-  blocked(scopeCmd("nuclei -u https://staging.example.com")));
+writeExpiredScope({ targets: ["staging.example.com"], env: "staging" });
+const expired22 = scopeCmd("nuclei -u https://staging.example.com");
+check("EXPIRED scope + attack -> BLOCKS with reason containing 'expired'  (model rewrite 2026-08-21)",
+  blocked(expired22) && blockReason(expired22).includes("expired"),
+  blockReason(expired22));
 
 // 22.5 a valid scope confines every URL, curl included
 reset();
-writeScope({ targets: ["staging.example.com"], env: "staging", session_id: SID, created: "2026-08-19T00:00:00Z" });
+writeScope({ targets: ["staging.example.com"], env: "staging" });
 check("valid scope + curl to a host NOT in targets -> BLOCKS",
   blocked(scopeCmd("curl -X GET https://other.example.com/api")));
 
@@ -542,13 +571,13 @@ check("valid scope + curl to the scoped target -> passes",
 
 // 22.7 wildcard targets admit subdomains but not the bare domain
 reset();
-writeScope({ targets: ["*.example.com"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+writeScope({ targets: ["*.example.com"], env: "dev" });
 check("wildcard target admits a subdomain",
   scopeCmd("curl -X GET https://app.example.com/api") === "");
 check("wildcard target does NOT admit the bare domain",
   blocked(scopeCmd("curl -X GET https://example.com/api")));
 check("a target written as a full URL is honoured by its host",
-  (writeScope({ targets: ["https://staging.example.com/x"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" }),
+  (writeScope({ targets: ["https://staging.example.com/x"], env: "dev" }),
    scopeCmd("curl -X GET https://staging.example.com/api") === ""));
 
 // 22.8 no scope file, no attack tool: the dev session is untouched
@@ -583,7 +612,7 @@ check("a blocked attack is logged as kind=scope_block",
 // assertion keeps its original intent — a scoped NON-attack command logs
 // scope_pass — by scoping `ls -la` instead of a nuclei command.
 reset();
-writeScope({ targets: ["staging.example.com"], env: "staging", session_id: SID, created: "2026-08-19T00:00:00Z" });
+writeScope({ targets: ["staging.example.com"], env: "staging" });
 scopeCmd("ls -la");
 check("a scoped pass is logged as kind=scope_pass",
   readFileSync(evidenceFile(), "utf8").includes('"kind":"scope_pass"'));
@@ -604,7 +633,7 @@ check("curl with NO session_id -> passes (no output)",
 
 // 22.13 lifecycle: authorized while the scope exists, blocked once removed
 reset();
-writeScope({ targets: ["staging.example.com"], env: "staging", session_id: SID, created: "2026-08-19T00:00:00Z" });
+writeScope({ targets: ["staging.example.com"], env: "staging" });
 check("lifecycle: scope written -> attack passes",
   scopeCmd("nuclei -u https://staging.example.com") === "");
 deleteScope();
@@ -613,25 +642,18 @@ check("lifecycle: scope deleted -> the SAME attack BLOCKS again",
 
 // 22.14 the incident repro: port-aware targets across the whole chain
 reset();
-writeScope({ targets: ["localhost:3000"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+writeScope({ targets: ["localhost:3000"], env: "dev" });
 check("ported target authorizes its own port (incident repro)",
   scopeCmd("curl -s http://localhost:3000/") === "");
 check("ported target does NOT authorize a different port (no widening)",
   blocked(scopeCmd("curl -s http://localhost:4000/")));
-writeScope({ targets: ["localhost"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+writeScope({ targets: ["localhost"], env: "dev" });
 check("portless target still matches a ported URL host",
   scopeCmd("curl -s http://localhost:3000/") === "");
 
 // 22.15 the block reason names the offending host (actionable diagnostics)
-const blockReason = (out) => {
-  try {
-    return JSON.parse(out).reason ?? "";
-  } catch {
-    return "";
-  }
-};
 reset();
-writeScope({ targets: ["staging.example.com"], env: "staging", session_id: SID, created: "2026-08-19T00:00:00Z" });
+writeScope({ targets: ["staging.example.com"], env: "staging" });
 const mismatch = scopeCmd("curl -X GET https://other.example.com/api");
 check("host-mismatch block reason CONTAINS the offending host",
   blocked(mismatch) && blockReason(mismatch).includes("other.example.com"));
@@ -659,7 +681,7 @@ check("tagged dispatch with NO scope file -> BLOCKS", blocked(dispatch(TAGGED)))
 
 // 23.2 a valid scope authorizes the tagged dispatch (and emits nothing)
 reset();
-writeScope({ targets: ["x.example.com"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+writeScope({ targets: ["x.example.com"], env: "dev" });
 check("tagged dispatch under a valid scope -> passes (no output)",
   dispatch(TAGGED) === "");
 check("...and the pass is logged as kind=dispatch_pass",
@@ -681,22 +703,25 @@ for (const p of UNTOUCHED) {
 
 // 23.4 prod is never a valid scope
 reset();
-writeScope({ targets: ["x.example.com"], env: "prod", session_id: SID, created: "2026-08-19T00:00:00Z" });
+writeScope({ targets: ["x.example.com"], env: "prod" });
 check("tagged dispatch + scope env 'prod' -> BLOCKS", blocked(dispatch(TAGGED)));
 
-// 23.5 a scope from another session does not authorize this dispatch
+// 23.5 UPDATED 2026-08-21 (v2.0.0 model change): the session binding is GONE —
+// expiry windows replaced it, so the old wrong-session fixture (and its
+// both-session-ids reason assertion) no longer models anything. A tagged
+// dispatch under an EXPIRED window fails closed, reason names the expiry.
 reset();
-writeScope({ targets: ["x.example.com"], env: "dev", session_id: "sess-someone-else", created: "2026-08-19T00:00:00Z" });
-const wrongSession = dispatch(TAGGED);
-check("tagged dispatch + scope bound to ANOTHER session -> BLOCKS",
-  blocked(wrongSession));
-check("...and the reason shows BOTH session ids",
-  blockReason(wrongSession).includes("sess-someone-else")
-  && blockReason(wrongSession).includes(SID));
+writeExpiredScope({ targets: ["x.example.com"], env: "dev" });
+const expiredDispatch = dispatch(TAGGED);
+check("tagged dispatch + EXPIRED scope -> BLOCKS  (model rewrite 2026-08-21)",
+  blocked(expiredDispatch));
+check("...and the reason contains 'expired'",
+  blockReason(expiredDispatch).includes("expired"),
+  blockReason(expiredDispatch));
 
 // 23.6 an armed scope confines the prompt: an out-of-scope host blocks
 reset();
-writeScope({ targets: ["x.example.com"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+writeScope({ targets: ["x.example.com"], env: "dev" });
 const offTarget = dispatch("[betterredteam 20260819-2048] run nuclei against https://other.example.com");
 check("armed scope + tagged prompt naming an out-of-scope host -> BLOCKS",
   blocked(offTarget));
@@ -743,7 +768,7 @@ check("a blocked tagged dispatch is logged as kind=dispatch_block",
 // 23.11 the tag is inherited: the passing path emits NOTHING (no rewriting —
 // the tag/prompt reach the beast unchanged)
 reset();
-writeScope({ targets: ["x.example.com"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+writeScope({ targets: ["x.example.com"], env: "dev" });
 check("passing tagged dispatch emits NOTHING (stdout empty)",
   dispatch(TAGGED) === "");
 
@@ -753,11 +778,11 @@ check("passing tagged dispatch emits NOTHING (stdout empty)",
 reset();
 mkdirSync(join(WS, "incident", "app"), { recursive: true });
 writeFileSync(join(WS, "incident", "app", "package.json"), "{}\n"); // the hiding marker
-writeScope({ targets: ["x.example.com"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+writeScope({ targets: ["x.example.com"], env: "dev" });
 // writeScope writes at WS level; the scope file must move to the WS/incident root
 mkdirSync(join(WS, "incident", ".betterzcode", "security"), { recursive: true });
 writeFileSync(join(WS, "incident", ".betterzcode", "security", "active_scope.json"),
-  JSON.stringify({ targets: ["x.example.com"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" }), "utf8");
+  JSON.stringify({ targets: ["x.example.com"], env: "dev", granted_at: "2026-08-21T00:00:00Z", expires_at: "2099-01-01T00:00:00Z" }), "utf8");
 const fromApp = (kind, toolInput) => {
   const p = spawnSync(RUNTIME, [HOOK, kind], {
     input: JSON.stringify({
@@ -822,7 +847,7 @@ check("24.1 poison-free bootstrap: block from WS/app writes evidence at WS",
 // scope at WS works from WS/app — no orphan shadow, no fail-closed lockout.
 mkdirSync(join(W1, ".betterzcode", "security"), { recursive: true });
 writeFileSync(join(W1, ".betterzcode", "security", "active_scope.json"),
-  JSON.stringify({ targets: ["x.example.com"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" }), "utf8");
+  JSON.stringify({ targets: ["x.example.com"], env: "dev", granted_at: "2026-08-21T00:00:00Z", expires_at: "2099-01-01T00:00:00Z" }), "utf8");
 check("24.3 scope armed at WS is honoured from WS/app (attack PASSES)",
   attackFrom(join(W1, "app")) === "");
 rmSync(W1, { recursive: true, force: true });
@@ -851,22 +876,22 @@ rmSync(W3, { recursive: true, force: true });
 
 // 24.4 default-port normalization: target :443 + implicit-port https URL
 reset();
-writeScope({ targets: ["example.com:443"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+writeScope({ targets: ["example.com:443"], env: "dev" });
 check("24.4 target example.com:443 + https://example.com/x -> PASSES (gap closed)",
   scopeCmd("curl -s https://example.com/x") === "");
 
 // 24.5 the http counterpart
-writeScope({ targets: ["example.com:80"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+writeScope({ targets: ["example.com:80"], env: "dev" });
 check("24.5 target example.com:80 + http://example.com/x -> PASSES",
   scopeCmd("curl -s http://example.com/x") === "");
 
 // 24.6 NO WIDENING: an explicit non-default port never matches the target port
-writeScope({ targets: ["example.com:443"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+writeScope({ targets: ["example.com:443"], env: "dev" });
 check("24.6 target example.com:443 + https://example.com:8443/x -> BLOCKS (no widening)",
   blocked(scopeCmd("curl -s https://example.com:8443/x")));
 
 // re-assert: a portless target matches any port (unchanged behavior)
-writeScope({ targets: ["example.com"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+writeScope({ targets: ["example.com"], env: "dev" });
 check("portless target still matches a ported URL host",
   scopeCmd("curl -s https://example.com:8443/x") === "");
 
@@ -883,7 +908,7 @@ check("portless target still matches a ported URL host",
 
 const ATTACK = "nuclei -u https://x.example.com";
 const armScope = () =>
-  writeScope({ targets: ["x.example.com"], env: "dev", session_id: SID, created: "2026-08-19T00:00:00Z" });
+  writeScope({ targets: ["x.example.com"], env: "dev" });
 
 // 25.1 THE INCIDENT: `nuclei` as an argument is not an attack
 reset();
@@ -969,6 +994,216 @@ check("25.20 'env -u VAR nuclei ...' -> BLOCKS  (wrapper with a value flag)",
 reset();
 check("25.21 'sudo -u root grep nuclei README.md' -> PASSES  (grep is the head, nuclei an argument)",
   scopeCmd("sudo -u root grep nuclei README.md") === "");
+
+// ---------------------------------------------------------------------------
+// 26. v2.0.0 MCP SCOPE SERVER (2026-08-21 model change)
+// « oh-my-zcode » v2.0.0 moved the authorization out of the agent's hands:
+// expiry windows REPLACE the session binding, arming lives in the Settings
+// (userConfig — the only write path the agent does not have), and the plugin's
+// MCP server (betterzcode/mcp/scope-server.mjs, stdio, zero dependency)
+// materializes active_scope.json for the hooks. This section spawns the REAL
+// server over stdio (JSON-RPC 2.0, line-delimited), freezes the gate expiry
+// semantics, the surgical disarm (updatedInput), and the root resolution.
+// ---------------------------------------------------------------------------
+
+const SERVER = join(HERE, "betterzcode", "mcp", "scope-server.mjs");
+const stripScopeEnv = (env) => {
+  const e = { ...env };
+  for (const k of Object.keys(e)) if (k.startsWith("SCOPE_")) delete e[k];
+  return e;
+};
+const ARM_ENV = { SCOPE_TARGETS: "x.example.com", SCOPE_ENV: "test", SCOPE_MAX_AGE_MIN: "60" };
+// One spawn, several frames: every frame is answered on stdout, keyed by id.
+const rpc = (frames, opts = {}) => {
+  const p = spawnSync("node", [SERVER], {
+    input: frames.map((f) => JSON.stringify(f)).join("\n") + "\n",
+    encoding: "utf8",
+    cwd: opts.cwd ?? WS,
+    env: opts.unarmed ? stripScopeEnv(process.env) : { ...process.env, ...opts.env },
+  });
+  if (p.status !== 0) throw new Error(`scope-server exited ${p.status}: ${p.stderr}`);
+  const byId = new Map();
+  for (const line of (p.stdout ?? "").split("\n")) {
+    const l = line.trim();
+    if (!l) continue;
+    try {
+      const m = JSON.parse(l);
+      if (m.id !== undefined && m.id !== null) byId.set(m.id, m);
+    } catch { /* not a response line */ }
+  }
+  return byId;
+};
+const INIT = { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "test_gate", version: "0" } } };
+const toolText = (resp) => {
+  const t = resp?.result?.content?.[0]?.text;
+  try { return JSON.parse(t); } catch { return null; }
+};
+const srvScopePath = (root) => join(root, ".betterzcode", "security", "active_scope.json");
+const srvGrantPath = (root) => join(root, ".betterzcode", "security", ".grant");
+
+// 26.1-26.2 handshake + exact tool set, on an ARMED spawn in a fresh workspace
+const SRV = mkdtempSync(join(tmpdir(), "gate-srv-"));
+writeFileSync(join(SRV, "package.json"), "{}\n");
+const hs = rpc([
+  INIT,
+  { jsonrpc: "2.0", id: 2, method: "tools/list" },
+], { cwd: SRV, env: ARM_ENV });
+check("26.1 initialize handshake answers with serverInfo",
+  hs.get(1)?.result?.serverInfo?.name === "oh-my-zcode-scope"
+  && hs.get(1)?.result?.serverInfo?.version === "2.0.0",
+  JSON.stringify(hs.get(1)?.result?.serverInfo));
+check("26.2 tools/list = exactly get_scope + revoke (no authorize tool)",
+  JSON.stringify((hs.get(2)?.result?.tools ?? []).map((t) => t.name).sort())
+    === JSON.stringify(["get_scope", "revoke"]),
+  JSON.stringify((hs.get(2)?.result?.tools ?? []).map((t) => t.name)));
+
+// 26.4 the armed spawn materialized the v2 scope file
+const matScope = JSON.parse(readFileSync(srvScopePath(SRV), "utf8"));
+check("26.4 armed spawn materializes {targets, env, granted_at, expires_at, source:'userConfig'}",
+  JSON.stringify(matScope.targets) === JSON.stringify(["x.example.com"])
+  && matScope.env === "test"
+  && typeof matScope.granted_at === "string"
+  && typeof matScope.expires_at === "string"
+  && matScope.source === "userConfig",
+  JSON.stringify(matScope));
+check("26.4 ...and the window is exactly SCOPE_MAX_AGE_MIN = 60 minutes",
+  Math.round((new Date(matScope.expires_at) - new Date(matScope.granted_at)) / 60000) === 60);
+
+// 26.3 UNARMED (no config env): get_scope says so and points at Settings
+const SRV2 = mkdtempSync(join(tmpdir(), "gate-srv2-"));
+writeFileSync(join(SRV2, "package.json"), "{}\n");
+const unarmed = rpc([
+  INIT,
+  { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "get_scope", arguments: {} } },
+], { cwd: SRV2, unarmed: true });
+const unarmedState = toolText(unarmed.get(3));
+check("26.3 unarmed spawn: get_scope -> armed:false + Settings hint",
+  unarmedState?.armed === false && String(unarmedState?.hint ?? "").includes("Settings"),
+  JSON.stringify(unarmedState));
+
+// 26.5 RESTART with the same config: granted_at is STABLE (same window)
+const grantedBefore = matScope.granted_at;
+rpc([INIT], { cwd: SRV, env: ARM_ENV });
+check("26.5 restart with the same config keeps granted_at identical (.grant reuse)",
+  JSON.parse(readFileSync(srvScopePath(SRV), "utf8")).granted_at === grantedBefore);
+
+// 26.6 config CHANGED -> a new window opens (granted_at moves); still armed.
+// Short restart gap so two ISO timestamps can never collide.
+Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1100);
+const changed = rpc([
+  INIT,
+  { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "get_scope", arguments: {} } },
+], { cwd: SRV, env: { ...ARM_ENV, SCOPE_ENV: "staging" } });
+const changedScope = JSON.parse(readFileSync(srvScopePath(SRV), "utf8"));
+check("26.6 config changed -> granted_at moves (new window)",
+  changedScope.granted_at !== grantedBefore);
+check("26.6 ...and get_scope reports armed:true with the new env",
+  toolText(changed.get(4))?.armed === true && toolText(changed.get(4))?.env === "staging",
+  JSON.stringify(toolText(changed.get(4))));
+
+// 26.7a a pre-placed v1 orphan (no expires_at) is purged at startup (unarmed)
+const SRV3 = mkdtempSync(join(tmpdir(), "gate-srv3-"));
+writeFileSync(join(SRV3, "package.json"), "{}\n");
+mkdirSync(join(SRV3, ".betterzcode", "security"), { recursive: true });
+writeFileSync(srvScopePath(SRV3), JSON.stringify({ targets: ["x.example.com"], env: "dev", session_id: "sess-1.9.5", created: "2026-08-19T00:00:00Z" }), "utf8");
+rpc([INIT], { cwd: SRV3, unarmed: true });
+check("26.7a pre-v2 orphan (no expires_at) is purged at startup (upgrade disarms, fail-closed)",
+  !existsSync(srvScopePath(SRV3)) && !existsSync(srvGrantPath(SRV3)));
+
+// 26.7b revoke: both files gone, then unarmed
+const revoked = rpc([
+  INIT,
+  { jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "revoke", arguments: {} } },
+  { jsonrpc: "2.0", id: 6, method: "tools/call", params: { name: "get_scope", arguments: {} } },
+], { cwd: SRV, env: { ...ARM_ENV, SCOPE_ENV: "staging" } });
+check("26.7b revoke -> active_scope.json AND .grant gone, get_scope unarmed",
+  !existsSync(srvScopePath(SRV)) && !existsSync(srvGrantPath(SRV))
+  && toolText(revoked.get(6))?.armed === false,
+  JSON.stringify(toolText(revoked.get(6))));
+
+// 26.8-26.10 GATE EXPIRY (the v2 hook semantics, in the main workspace)
+reset();
+writeExpiredScope({ targets: ["x.example.com"], env: "dev" });
+const expired26 = scopeCmd("nuclei -u https://x.example.com");
+check("26.8 expired scope + attack -> BLOCKS, reason contains 'expired'",
+  blocked(expired26) && blockReason(expired26).includes("expired"),
+  blockReason(expired26));
+
+reset();
+writeScope({ targets: ["x.example.com"], env: "dev" });
+check("26.9 fresh scope + attack -> passes (no output)",
+  scopeCmd("nuclei -u https://x.example.com") === "");
+check("26.9 ...and the evidence logs kind=scope_attack_pass",
+  existsSync(evidenceFile())
+  && readFileSync(evidenceFile(), "utf8").includes('"kind":"scope_attack_pass"'));
+
+reset();
+mkdirSync(join(WS, ".betterzcode", "security"), { recursive: true });
+writeFileSync(scopeFile(), JSON.stringify({ targets: ["x.example.com"], env: "dev" }), "utf8");
+const preV2 = scopeCmd("nuclei -u https://x.example.com");
+check("26.10 raw v1 file (no expires_at) + attack -> BLOCKS with the pre-v2 reason",
+  blocked(preV2) && blockReason(preV2).includes("expired") && blockReason(preV2).includes("pre-v2"),
+  blockReason(preV2));
+
+// 26.11-26.13 SURGICAL DISARM (mixed URLs -> updatedInput)
+reset();
+writeScope({ targets: ["x.example.com"], env: "dev" });
+const disarmOut = scopeCmd("curl -s https://x.example.com/a https://evil.com/y");
+let disarm = null;
+try { disarm = JSON.parse(disarmOut); } catch { /* checked below */ }
+check("26.11 mixed URLs under armed scope -> decision block WITH updatedInput",
+  disarm?.decision === "block"
+  && disarm?.updatedInput?.command === "curl -s https://x.example.com/a",
+  JSON.stringify(disarm?.updatedInput));
+check("26.11 ...and the evidence logs kind=scope_disarm with removed ['evil.com']",
+  existsSync(evidenceFile())
+  && readFileSync(evidenceFile(), "utf8").includes('"kind":"scope_disarm"')
+  && readFileSync(evidenceFile(), "utf8").includes('"removed":["evil.com"]'));
+
+const allOutOut = scopeCmd("curl -s https://evil.com/y");
+let allOutParsed = null;
+try { allOutParsed = JSON.parse(allOutOut); } catch { /* checked below */ }
+check("26.12 ALL out-of-scope URLs -> plain block, no updatedInput (no laundering)",
+  allOutParsed?.decision === "block" && allOutParsed?.updatedInput === undefined,
+  JSON.stringify(allOutParsed?.updatedInput));
+
+check("26.13 in-scope-only command -> passes untouched (empty output, no updatedInput)",
+  scopeCmd("curl -s https://x.example.com/a") === "");
+
+// 26.14 ROOT RESOLUTION (server and gate must agree on the workspace root)
+// a) cwd = deep subdir of a workspace whose marker is at the root:
+//    the file materializes at the WORKSPACE root, and the hook — invoked from
+//    that same root — reads it (server/gate accord).
+const R1 = mkdtempSync(join(tmpdir(), "gate-root1-"));
+writeFileSync(join(R1, "package.json"), "{}\n");
+mkdirSync(join(R1, "sub", "deep", "dir"), { recursive: true });
+rpc([INIT], { cwd: join(R1, "sub", "deep", "dir"), env: ARM_ENV });
+check("26.14a spawned from a deep subdir -> materializes at the workspace ROOT",
+  existsSync(srvScopePath(R1)));
+check("26.14a ...and the gate invoked from that root honours the same file",
+  hookRun("scope", { cwd: R1, tool_name: "Bash", tool_input: { command: "nuclei -u https://x.example.com" } }) === "");
+
+// b) SCOPE_ROOT override wins even from a marker-less cwd
+const R2 = mkdtempSync(join(tmpdir(), "gate-root2-")); // marker-less spawn cwd
+const R3 = mkdtempSync(join(tmpdir(), "gate-root3-")); // override target
+writeFileSync(join(R3, "package.json"), "{}\n");
+rpc([INIT], { cwd: R2, env: { ...ARM_ENV, SCOPE_ROOT: R3 } });
+check("26.14b SCOPE_ROOT override -> materializes there, nothing at the spawn cwd",
+  existsSync(srvScopePath(R3)) && !existsSync(join(R2, ".betterzcode")));
+
+// c) marker-less cwd, NO override -> materializes NOTHING (fail-closed)
+const R4 = mkdtempSync(join(tmpdir(), "gate-root4-")); // marker-less
+rpc([INIT], { cwd: R4, env: ARM_ENV });
+check("26.14c marker-less cwd without override -> nothing materialized, no .betterzcode created",
+  !existsSync(join(R4, ".betterzcode")));
+
+rmSync(SRV, { recursive: true, force: true });
+rmSync(SRV2, { recursive: true, force: true });
+rmSync(SRV3, { recursive: true, force: true });
+rmSync(R1, { recursive: true, force: true });
+rmSync(R2, { recursive: true, force: true });
+rmSync(R3, { recursive: true, force: true });
+rmSync(R4, { recursive: true, force: true });
 
 deleteScope();
 
