@@ -28,18 +28,22 @@ Three outcomes only:
 
 No attack request leaves before option 1.
 
-## Step 0.5: WRITE THE AUTHORIZATION
+## Step 0.5: ARM THE AUTHORIZATION (user-held)
 
-After the explicit yes, write TWO files:
+Since v2 the authorization is NOT written by you — it lives in the Settings, the one write path the agent does not have. Ask the USER to arm it:
 
-- `.betterzcode/security/<YYYYMMDD-HHMM>_<slug>_<session8>/scope.json` — the frozen record: targets, env, timestamp, the user's confirmation quoted verbatim.
-- `.betterzcode/security/active_scope.json` (project root's `.betterzcode/security/`) — the gate-readable record: `targets` (array of hosts, wildcards allowed), `env` (`dev|staging|test`), `session_id` (the current session id), `created` (ISO).
+1. Settings → Plugins → oh-my-zcode → fill the scope fields:
+   - `scope_targets` — hosts, comma-separated (`localhost, staging.app.io, *.app.io`; full URLs also work)
+   - `scope_env` — `dev`, `staging` or `test`
+   - `scope_max_age_min` — the authorization window in minutes (default 60)
+2. If the plugin was already running, the user re-toggles it once so the MCP scope server restarts and materializes the scope.
+3. Targets contract (identical to the gate's): a host written WITHOUT port authorizes the host on ANY port; a target WITH a port (`localhost:3000`) authorizes ONLY that port, never another.
 
-  Targets contract: hosts are written WITHOUT port by default (`localhost`, `staging.app.io`, `*.app.io`; full URLs also work) — a portless target authorizes the host on ANY port. A target MAY carry a port (`localhost:3000`) and then authorizes ONLY that port, never another.
+Then YOU verify — read-only, never write `active_scope.json` yourself: call the `get_scope` tool (the plugin's MCP scope server). It returns the armed state (`targets`, `env`, `granted_at`, `expires_at`) or "no scope armed". Copy the returned state verbatim into the run's frozen record `.betterzcode/security/<YYYYMMDD-HHMM>_<slug>_<session8>/scope.json` (targets, env, window, the user's confirmation quoted verbatim).
 
-  Session id: the current session id is the NEWEST file in `.betterzcode/evidence/` (written by the hook) — never guess it from agent output paths.
+If `get_scope` answers "no scope armed": the user has not armed it (or the window closed) — stop and ask; do not proceed, do not work around.
 
-State to the user: the scope gate now enforces this mechanically — attack commands outside this scope and session are blocked.
+State to the user: the scope gate now enforces this mechanically — attack commands outside this scope, or after the window expires, are blocked.
 
 ## Step 0.6: PREFLIGHT
 
@@ -113,7 +117,7 @@ The run's audit trail lives durably in the TARGET project's `.betterzcode/eviden
 
 ## Step 8: DISARM AND SIGN
 
-Delete `.betterzcode/security/active_scope.json` — the gate closes.
+Disarm by calling the `revoke` tool (the MCP scope server removes the armed scope — the gate closes immediately). The user can also clear the Settings scope fields, which prevents any re-arm on the next server restart. Never rewrite `active_scope.json` by hand.
 
 Then optionally end the final message with, alone on the last line:
 
