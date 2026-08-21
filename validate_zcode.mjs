@@ -112,7 +112,56 @@ function checkManifest(root) {
   } else {
     ok("plugin.json does not re-declare hooks/hooks.json (correct)");
   }
+  checkMcpServers(root, man);
+  checkUserConfig(root, man);
   return man;
+}
+
+/**
+ * mcpServers (v2.0.0 surface): each stdio server's target script must exist
+ * under the plugin root. ${ZCODE_PLUGIN_ROOT}/ paths are resolved against it —
+ * a declared server whose script is missing fails at spawn, silently.
+ */
+function checkMcpServers(root, man) {
+  if (!man.mcpServers) return;
+  const servers = Object.entries(man.mcpServers);
+  ok(`mcpServers : ${servers.length} server(s) declared`);
+  for (const [id, srv] of servers) {
+    if (srv.type !== "stdio") {
+      err(`mcpServers.${id} : only the 'stdio' transport is validated (got '${srv.type}')`);
+      continue;
+    }
+    const args = (srv.args ?? []).map(String);
+    const target = args.find((a) => a.includes("${ZCODE_PLUGIN_ROOT}"));
+    if (!target) {
+      err(`mcpServers.${id} : no '${"${ZCODE_PLUGIN_ROOT"}}/...' arg — cannot locate the server script`);
+      continue;
+    }
+    const rel = target.split("${ZCODE_PLUGIN_ROOT}")[1].replace(/^[\\/]+/, "");
+    if (existsSync(join(root, rel))) {
+      ok(`mcpServers.${id} : target script present (${rel})`);
+    } else {
+      err(`mcpServers.${id} : target script not found (${rel})`);
+    }
+  }
+}
+
+/** userConfig (v2.0.0 surface): each entry needs name/type/title, primitive default. */
+function checkUserConfig(root, man) {
+  if (!man.userConfig) return;
+  const entries = Array.isArray(man.userConfig) ? man.userConfig : Object.entries(man.userConfig)
+    .map(([k, v]) => ({ name: k, ...v }));
+  if (!entries.length) err("userConfig : declared but empty");
+  for (const e of entries) {
+    for (const k of ["name", "type", "title"]) {
+      if (!e[k]) err(`userConfig.${e.name ?? "?"} : field '${k}' missing`);
+    }
+    if ("default" in e && e.default !== null && typeof e.default === "object") {
+      err(`userConfig.${e.name ?? "?"} : default must be a primitive (got ${typeof e.default})`);
+    } else {
+      ok(`userConfig.${e.name ?? "unnamed entry"} : entry valid (type=${e.type})`);
+    }
+  }
 }
 
 function checkHooks(root) {
@@ -305,12 +354,23 @@ function checkVersionStamp(root, man) {
     try {
       const mk = JSON.parse(readText(marketplace));
       const entry = (mk.plugins ?? []).find((p) => p.name === man.name);
-      if (!entry) {
+      // Name agreement (same severity as version drift): a plugin renamed in one
+      // manifest only breaks the update path in both directions.
+      const base = root.split(/[\\/]/).pop();
+      const bySource = (mk.plugins ?? []).find((p) =>
+        String(p.source ?? "").split(/[\\/]/).pop().replace(/^\./, "") === base);
+      if (bySource && bySource.name !== man.name) {
+        err(`name drift: marketplace.json says '${bySource.name}', `
+          + `plugin.json says '${man.name}' — the two manifests must agree`);
+      } else if (bySource) {
+        ok(`marketplace.json and plugin.json agree on name '${man.name}'`);
+      }
+      if (!entry && !bySource) {
         err(`marketplace.json lists no plugin named '${man.name}'`);
-      } else if (entry.version !== man.version) {
+      } else if (entry && entry.version !== man.version) {
         err(`version drift: marketplace.json says ${entry.version}, `
           + `plugin.json says ${man.version} — ZCode compares the marketplace one`);
-      } else {
+      } else if (entry) {
         ok(`marketplace.json and plugin.json agree on version ${man.version}`);
       }
     } catch (e) {
