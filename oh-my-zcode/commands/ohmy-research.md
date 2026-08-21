@@ -60,7 +60,7 @@ The asymmetry is deliberate: a false refutation costs one abandoned path, a fals
 
 ## Step 4: Dispatch `ohmy-draft-writer`
 
-At the **project root**, create `.betterzcode/research/<YYYYMMDD-HHMM>_<slug>_<session8>/` (where `<slug>` is three or four words from the Question and `<session8>` is the first 8 characters of the session id). Then delegate to `ohmy-draft-writer`: pass it the folder path, the four framing parts, and the axes' notes — each claim with its source URL and a verbatim quote. It writes `report.md` there and answers with ARTIFACT / CONFIDENCE.
+At the **project root**, create `.oh-my-zcode/research/<YYYYMMDD-HHMM>_<slug>_<session8>/` (where `<slug>` is three or four words from the Question and `<session8>` is the first 8 characters of the session id). Then delegate to `ohmy-draft-writer`: pass it the folder path, the four framing parts, and the axes' notes — each claim with its source URL and a verbatim quote. It writes `report.md` there and answers with ARTIFACT / CONFIDENCE.
 
 **You never write or edit the report yourself.** If the draft is wrong, that is a finding for the verifier (step 5) or a new draft-writer dispatch with the corrections to apply.
 
@@ -85,7 +85,7 @@ This is not bureaucracy. It is the difference between "an agent told me it read 
 
 **This rule is yours and it is non-delegable.** No writer, no verifier, no subagent can open the sources on your behalf: the orchestrator signs only on pages this session retrieved.
 
-Then copy `.betterzcode/evidence/<session id>.jsonl` into the report folder as `evidence.jsonl`. The original stays where it is.
+Then copy `.oh-my-zcode/evidence/<session id>.jsonl` into the report folder as `evidence.jsonl`. The original stays where it is.
 
 ## Step 7: Sign
 

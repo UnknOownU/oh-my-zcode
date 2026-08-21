@@ -82,9 +82,9 @@ function blocked(out) {
   }
 }
 
-const reset = () => rmSync(join(WS, ".betterzcode"), { recursive: true, force: true });
+const reset = () => rmSync(join(WS, ".oh-my-zcode"), { recursive: true, force: true });
 const evidenceFile = () =>
-  join(WS, ".betterzcode", "evidence", `${SID.replace(/[^\w.-]/g, "_")}.jsonl`);
+  join(WS, ".oh-my-zcode", "evidence", `${SID.replace(/[^\w.-]/g, "_")}.jsonl`);
 
 console.log(`Hook under test : ${HOOK}\nRuntime         : ${RUNTIME}\nSandbox         : ${WS}\n`);
 
@@ -198,7 +198,7 @@ check("git/cat/grep/echo/tree are not proof -> BLOCKS",
 // 13. evidence lands in the per-session file, not a loose one
 reset();
 bash("npm test");
-check("evidence written to .betterzcode/evidence/<session>.jsonl",
+check("evidence written to .oh-my-zcode/evidence/<session>.jsonl",
   existsSync(evidenceFile()),
   `expected ${evidenceFile()}`);
 
@@ -217,7 +217,7 @@ check("a proof written from a subfolder lands in the ROOT log",
   existsSync(evidenceFile())
   && readFileSync(evidenceFile(), "utf8").includes("npm test"));
 check("no stray log created in the subfolder",
-  !existsSync(join(WS, "app", "deep", ".betterzcode")));
+  !existsSync(join(WS, "app", "deep", ".oh-my-zcode")));
 
 // the gate must see that proof from the root
 check("gate sees the subfolder proof and lets PASS through",
@@ -232,7 +232,7 @@ const probe = spawnSync(RUNTIME, [HOOK, "session_start"], {
 });
 check("probe payload without session_id still injects the doctrine",
   probe.stdout.includes("additionalContext"));
-check("probe payload writes no log file", !existsSync(join(WS, ".betterzcode")));
+check("probe payload writes no log file", !existsSync(join(WS, ".oh-my-zcode")));
 
 // ---------------------------------------------------------------------------
 // 16. CITATION GATE
@@ -339,7 +339,7 @@ check("both signatures, both backed -> lets through",
 reset();
 for (const u of ["https://digiforma.com/prix/", "https://kaliopi.io/", "https://planor.fr/"]) fetchUrl(u);
 check("pages fetched, citations live in the report file, message cites none -> DOES NOT BLOCK  (the real false positive)",
-  !blocked(stop("Report written to .betterzcode/research/20260819-0658_x/report.md — 30 sources opened.\n\nSOURCES: VERIFIED")));
+  !blocked(stop("Report written to .oh-my-zcode/research/20260819-0658_x/report.md — 30 sources opened.\n\nSOURCES: VERIFIED")));
 
 reset();
 check("signature with nothing fetched all session -> STILL BLOCKS  (a contradiction, not a silence)",
@@ -500,7 +500,7 @@ check("marker with ZERO verification commands the whole session -> BLOCKS",
 // normal dev session with no scope file feels zero interference.
 // ---------------------------------------------------------------------------
 
-const scopeFile = () => join(WS, ".betterzcode", "security", "active_scope.json");
+const scopeFile = () => join(WS, ".oh-my-zcode", "security", "active_scope.json");
 // UPDATED 2026-08-21 (v2.0.0 model change): fixtures are v2-format
 // {targets, env, granted_at, expires_at, source}. Expiry windows REPLACE the
 // v1.9.5 session binding — authorization is armed BY INVOCATION (the
@@ -511,7 +511,7 @@ const writeScope = (s) => {
   const grantedAt = s.granted_at ?? new Date().toISOString();
   const expiresAt = s.expires_at
     ?? new Date(new Date(grantedAt).getTime() + 60 * 60000).toISOString();
-  mkdirSync(join(WS, ".betterzcode", "security"), { recursive: true });
+  mkdirSync(join(WS, ".oh-my-zcode", "security"), { recursive: true });
   writeFileSync(scopeFile(), JSON.stringify({
     targets: s.targets,
     env: s.env,
@@ -588,7 +588,7 @@ check("NO scope file + curl anywhere -> passes (normal dev session)",
 
 // 22.9 malformed scope file fails closed for attack tools
 reset();
-mkdirSync(join(WS, ".betterzcode", "security"), { recursive: true });
+mkdirSync(join(WS, ".oh-my-zcode", "security"), { recursive: true });
 writeFileSync(scopeFile(), "\x00\x01 not json \x02", "utf8");
 check("garbage active_scope.json + attack -> BLOCKS (fail closed)",
   blocked(scopeCmd("nuclei -l hosts.txt")));
@@ -753,7 +753,7 @@ check("untagged fixture with NO session_id -> passes (untouched)",
 
 // 23.8 malformed scope file fails closed
 reset();
-mkdirSync(join(WS, ".betterzcode", "security"), { recursive: true });
+mkdirSync(join(WS, ".oh-my-zcode", "security"), { recursive: true });
 writeFileSync(scopeFile(), "\x00\x01 not json \x02", "utf8");
 check("garbage active_scope.json + tagged dispatch -> BLOCKS (fail closed)",
   blocked(dispatch(TAGGED)));
@@ -780,15 +780,15 @@ check("passing tagged dispatch emits NOTHING (stdout empty)",
   dispatch(TAGGED) === "");
 
 // 23.12 THE INCIDENT REGRESSION (run 20260819-2107): a subfolder with its own
-// package.json must no longer hide the parent .betterzcode — the walk passes
-// OVER nearer markers and prefers the nearest .betterzcode ancestor.
+// package.json must no longer hide the parent .oh-my-zcode — the walk passes
+// OVER nearer markers and prefers the nearest .oh-my-zcode ancestor.
 reset();
 mkdirSync(join(WS, "incident", "app"), { recursive: true });
 writeFileSync(join(WS, "incident", "app", "package.json"), "{}\n"); // the hiding marker
 writeScope({ targets: ["x.example.com"], env: "dev" });
 // writeScope writes at WS level; the scope file must move to the WS/incident root
-mkdirSync(join(WS, "incident", ".betterzcode", "security"), { recursive: true });
-writeFileSync(join(WS, "incident", ".betterzcode", "security", "active_scope.json"),
+mkdirSync(join(WS, "incident", ".oh-my-zcode", "security"), { recursive: true });
+writeFileSync(join(WS, "incident", ".oh-my-zcode", "security", "active_scope.json"),
   JSON.stringify({ targets: ["x.example.com"], env: "dev", granted_at: "2026-08-21T00:00:00Z", expires_at: "2099-01-01T00:00:00Z" }), "utf8");
 const fromApp = (kind, toolInput) => {
   const p = spawnSync(RUNTIME, [HOOK, kind], {
@@ -805,23 +805,23 @@ const fromApp = (kind, toolInput) => {
 };
 check("incident: scope armed at the parent root, cwd in a subfolder with its own package.json -> attack PASSES",
   fromApp("scope", { command: "nuclei -u https://x.example.com" }) === "");
-check("incident: evidence lands in the parent .betterzcode (no split)",
-  existsSync(join(WS, "incident", ".betterzcode", "evidence", `${SID}.jsonl`))
-  && !existsSync(join(WS, "incident", "app", ".betterzcode")));
-// nearest-wins: a .betterzcode at WS/incident/app now shadows the parent — the
+check("incident: evidence lands in the parent .oh-my-zcode (no split)",
+  existsSync(join(WS, "incident", ".oh-my-zcode", "evidence", `${SID}.jsonl`))
+  && !existsSync(join(WS, "incident", "app", ".oh-my-zcode")));
+// nearest-wins: a .oh-my-zcode at WS/incident/app now shadows the parent — the
 // scope written only at WS/incident is no longer found, the attack blocks.
-mkdirSync(join(WS, "incident", "app", ".betterzcode"), { recursive: true });
-check("nearest-wins: a nearer .betterzcode shadows the parent scope -> attack BLOCKS",
+mkdirSync(join(WS, "incident", "app", ".oh-my-zcode"), { recursive: true });
+check("nearest-wins: a nearer .oh-my-zcode shadows the parent scope -> attack BLOCKS",
   blocked(fromApp("scope", { command: "nuclei -u https://x.example.com" })));
 rmSync(join(WS, "incident"), { recursive: true, force: true });
 
 // ---------------------------------------------------------------------------
 // 24. BOUNDARY BOOTSTRAP + DEFAULT PORTS
 // 24.1-24.3 freeze the v1.9.3 Verifier finding (bootstrap poisoning): an
-// evidence bootstrap at the NEAREST marker creates an orphan .betterzcode that
+// evidence bootstrap at the NEAREST marker creates an orphan .oh-my-zcode that
 // nearest-wins promotes to a permanent shadow of the true root. Evidence
 // writes therefore bootstrap at the WORKSPACE boundary (highest .git ancestor,
-// else highest marker ancestor) when no .betterzcode ancestor exists.
+// else highest marker ancestor) when no .oh-my-zcode ancestor exists.
 // 24.4-24.6 freeze default-port normalization: a target whose explicit port
 // equals the scheme default matches an implicit-port URL of that scheme, and
 // a ported target never authorizes a different explicit port.
@@ -837,9 +837,9 @@ const hookRun = (kind, payload) => {
 };
 const attackFrom = (cwd) =>
   hookRun("scope", { cwd, tool_name: "Bash", tool_input: { command: "nuclei -u https://x.example.com" } });
-const evFile = (root) => join(root, ".betterzcode", "evidence", `${SID}.jsonl`);
+const evFile = (root) => join(root, ".oh-my-zcode", "evidence", `${SID}.jsonl`);
 
-// 24.1 WS and WS/app both carry package.json, no .betterzcode anywhere:
+// 24.1 WS and WS/app both carry package.json, no .oh-my-zcode anywhere:
 // a scope BLOCK (evidence write) bootstraps at WS, NOT at the nearest marker.
 const W1 = mkdtempSync(join(tmpdir(), "gate-boot-"));
 mkdirSync(join(W1, "app"), { recursive: true });
@@ -848,12 +848,12 @@ writeFileSync(join(W1, "app", "package.json"), "{}\n");
 check("24.1 poison-free bootstrap: block from WS/app writes evidence at WS",
   blocked(attackFrom(join(W1, "app")))
   && existsSync(evFile(W1))
-  && !existsSync(join(W1, "app", ".betterzcode")));
+  && !existsSync(join(W1, "app", ".oh-my-zcode")));
 
 // 24.3 the incident's happy ending: with the bootstrap landed at WS, arming the
 // scope at WS works from WS/app — no orphan shadow, no fail-closed lockout.
-mkdirSync(join(W1, ".betterzcode", "security"), { recursive: true });
-writeFileSync(join(W1, ".betterzcode", "security", "active_scope.json"),
+mkdirSync(join(W1, ".oh-my-zcode", "security"), { recursive: true });
+writeFileSync(join(W1, ".oh-my-zcode", "security", "active_scope.json"),
   JSON.stringify({ targets: ["x.example.com"], env: "dev", granted_at: "2026-08-21T00:00:00Z", expires_at: "2099-01-01T00:00:00Z" }), "utf8");
 check("24.3 scope armed at WS is honoured from WS/app (attack PASSES)",
   attackFrom(join(W1, "app")) === "");
@@ -869,15 +869,15 @@ writeFileSync(join(W2, "app", "package.json"), "{}\n");
 check("24.2 .git ancestor wins over the nearest marker",
   blocked(attackFrom(join(W2, "app")))
   && existsSync(evFile(W2))
-  && !existsSync(join(W2, "app", ".betterzcode")));
+  && !existsSync(join(W2, "app", ".oh-my-zcode")));
 rmSync(W2, { recursive: true, force: true });
 
-// 24.7 fresh workspace unchanged: cwd == WS root, no .betterzcode -> the first
-// session_start log write creates WS/.betterzcode (the SessionStart case).
+// 24.7 fresh workspace unchanged: cwd == WS root, no .oh-my-zcode -> the first
+// session_start log write creates WS/.oh-my-zcode (the SessionStart case).
 const W3 = mkdtempSync(join(tmpdir(), "gate-fresh-"));
 writeFileSync(join(W3, "package.json"), "{}\n");
 hookRun("session_start", { cwd: W3, source: "startup" });
-check("24.7 fresh workspace: first log write creates WS/.betterzcode",
+check("24.7 fresh workspace: first log write creates WS/.oh-my-zcode",
   existsSync(evFile(W3)));
 rmSync(W3, { recursive: true, force: true });
 
@@ -1063,10 +1063,10 @@ const toolText = (resp) => {
   const t = resp?.result?.content?.[0]?.text;
   try { return JSON.parse(t); } catch { return null; }
 };
-const srvScopePath = (root) => join(root, ".betterzcode", "security", "active_scope.json");
-const srvGrantPath = (root) => join(root, ".betterzcode", "security", ".grant");
+const srvScopePath = (root) => join(root, ".oh-my-zcode", "security", "active_scope.json");
+const srvGrantPath = (root) => join(root, ".oh-my-zcode", "security", ".grant");
 const writeServerScope = (root, scope) => {
-  mkdirSync(join(root, ".betterzcode", "security"), { recursive: true });
+  mkdirSync(join(root, ".oh-my-zcode", "security"), { recursive: true });
   writeFileSync(srvScopePath(root), JSON.stringify(scope), "utf8");
 };
 
@@ -1135,7 +1135,7 @@ check("26.5 ...and the expired file is LEFT IN PLACE (read path never deletes)",
 const SRV3 = mkdtempSync(join(tmpdir(), "gate-srv3-"));
 writeFileSync(join(SRV3, "package.json"), "{}\n");
 writeServerScope(SRV3, { targets: ["x.example.com"], env: "dev", session_id: "sess-1.9.5", created: "2026-08-19T00:00:00Z" });
-mkdirSync(join(SRV3, ".betterzcode", "security"), { recursive: true });
+mkdirSync(join(SRV3, ".oh-my-zcode", "security"), { recursive: true });
 writeFileSync(srvGrantPath(SRV3), "stale", "utf8");
 const purged = rpc([INIT, GET_SCOPE(6)], { cwd: SRV3 });
 check("26.6 pre-v2 orphan (no expires_at) is purged at startup (file AND stale .grant)",
@@ -1175,13 +1175,13 @@ writeFileSync(join(R3, "package.json"), "{}\n");
 writeServerScope(R3, INVOCATION_SCOPE);
 check("26.8b SCOPE_ROOT override wins from a marker-less cwd -> reads there, creates nothing at the cwd",
   toolText(rpc([INIT, GET_SCOPE(10)], { cwd: R2, env: { SCOPE_ROOT: R3 } }).get(10))?.armed === true
-  && !existsSync(join(R2, ".betterzcode")));
+  && !existsSync(join(R2, ".oh-my-zcode")));
 
 // c) marker-less cwd, NO override -> nothing read, nothing created (fail-closed)
 const R4 = mkdtempSync(join(tmpdir(), "gate-root4-")); // marker-less
-check("26.8c marker-less cwd without override -> unarmed, no .betterzcode created",
+check("26.8c marker-less cwd without override -> unarmed, no .oh-my-zcode created",
   toolText(rpc([INIT, GET_SCOPE(11)], { cwd: R4 }).get(11))?.armed === false
-  && !existsSync(join(R4, ".betterzcode")));
+  && !existsSync(join(R4, ".oh-my-zcode")));
 
 // 26.9 THE 2026-08-21 DEBT FIX: `command -v X` resolves a NAME, it never
 // executes X — an unarmed gate must not block its own diagnostics.
@@ -1210,7 +1210,7 @@ check("26.10 OLD v1 tag under an ARMED scope -> passes with NO dispatch_pass log
 // 26.11 the hook's pre-v2 branch: a raw v1 file (no expires_at) blocks with
 // the dedicated reason (re-arm by invocation)
 reset();
-mkdirSync(join(WS, ".betterzcode", "security"), { recursive: true });
+mkdirSync(join(WS, ".oh-my-zcode", "security"), { recursive: true });
 writeFileSync(scopeFile(), JSON.stringify({ targets: ["x.example.com"], env: "dev" }), "utf8");
 const preV2 = scopeCmd("nuclei -u https://x.example.com");
 check("26.11 raw v1 file (no expires_at) + attack -> BLOCKS with the pre-v2 reason",

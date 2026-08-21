@@ -73,8 +73,8 @@ function walk(dir) {
   const out = [];
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
-    // Skip .betterzcode runtime dir: run artifacts in the dev workspace mutated the digest with no content change (README says gitignore it).
-    if (name === ".betterzcode") continue;
+    // Skip .oh-my-zcode runtime dir: run artifacts in the dev workspace mutated the digest with no content change (README says gitignore it).
+    if (name === ".oh-my-zcode") continue;
     if (statSync(p).isDirectory()) out.push(...walk(p));
     else out.push(p);
   }

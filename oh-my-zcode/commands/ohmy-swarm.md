@@ -76,7 +76,7 @@ Retries past the first cycle are cheap only in appearance: each full cycle here 
 
 ## Step 5: Write the run report
 
-At the **project root**, in `.betterzcode/plans/<YYYYMMDD-HHMM>_<slug>_<session8>/` (reuse the folder if `/ohmy-plan` already created one), write `report.md`:
+At the **project root**, in `.oh-my-zcode/plans/<YYYYMMDD-HHMM>_<slug>_<session8>/` (reuse the folder if `/ohmy-plan` already created one), write `report.md`:
 
 ```markdown
 # Run report - <Goal>
@@ -104,7 +104,7 @@ The **Iterations** column carries the honest attempt count: a task resolved on a
 <what stayed untested, and why>
 ```
 
-Then copy the session's evidence file, `.betterzcode/evidence/<session id>.jsonl`, into the same folder as `evidence.jsonl`. The original stays where it is.
+Then copy the session's evidence file, `.oh-my-zcode/evidence/<session id>.jsonl`, into the same folder as `evidence.jsonl`. The original stays where it is.
 
 **A checked box must carry its command, its raw output and its exit code.** A box you tick without those is a claim, not a proof, and this report exists precisely to stop being believed on your word. The evidence file is written by the hooks and you do not control it: whoever reads both can tell them apart.
 

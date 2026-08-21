@@ -145,7 +145,7 @@ Set `max_tokens` to **131072** — the documented ceiling — and never below. Y
 ### What lands on disk
 
 ```
-.betterzcode/
+.oh-my-zcode/
 ├── evidence/<session id>.jsonl     written by the hooks — proof
 ├── plans/<run>/                    scaffold.md, plan.md, report.md, evidence.jsonl
 ├── research/<run>/                 report.md, evidence.jsonl
@@ -183,7 +183,7 @@ Versioning follows [docs/versioning.md](docs/versioning.md) — the 1.x line clo
 
 ## Uninstalling
 
-**Settings → Plugins → oh-my-zcode → uninstall.** Run data stays in `.betterzcode/`. Migration from 1.x: uninstall `betterzcode` before installing `oh-my-zcode`; a 1.9.5 scope left armed mid-run is disarmed at the first v2 server start — fail-closed by design.
+**Settings → Plugins → oh-my-zcode → uninstall.** Run data stays in `.oh-my-zcode/`. Migration from 1.x: uninstall `betterzcode` before installing `oh-my-zcode`; a 1.9.5 scope left armed mid-run is disarmed at the first v2 server start — fail-closed by design.
 
 ## License
 

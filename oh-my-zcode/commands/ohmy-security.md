@@ -23,7 +23,7 @@ False positives are the plague of security tooling. Adversarial verification eli
 
 Before ANY request to the target, present the authorization block — targets, type of test, owner confirmation, testing type — and REQUIRE the user's explicit authorization.
 
-Freeze the scope to `.betterzcode/security/<run>/scope.json`. Anything discovered outside the scope is documented, never tested. Dangerous operations (dump, write on target, brute force, privilege escalation) require a second explicit confirmation. When in doubt, STOP and ASK.
+Freeze the scope to `.oh-my-zcode/security/<run>/scope.json`. Anything discovered outside the scope is documented, never tested. Dangerous operations (dump, write on target, brute force, privilege escalation) require a second explicit confirmation. When in doubt, STOP and ASK.
 
 ## Step 0.6: PREFLIGHT
 
@@ -39,7 +39,7 @@ Build the attack plan by WSTG angle families. Delegate to `ohmy-plan-critic` (th
 
 ## Step 3: RECON
 
-One agent builds `.betterzcode/security/<YYYYMMDD-HHMM>_<slug>_<session8>/surface.md`: endpoints, parameters, authentication, tech stack.
+One agent builds `.oh-my-zcode/security/<YYYYMMDD-HHMM>_<slug>_<session8>/surface.md`: endpoints, parameters, authentication, tech stack.
 
 The surface map decides the team: it fits one page -> a **single attacker**; otherwise up to **3 attackers by family** (injection / auth+session / authorization+business logic).
 
@@ -67,7 +67,7 @@ Write `report.md` in the run folder:
 - WSTG coverage checklist
 - NOT COVERED, with reasons
 
-Copy `scope.json` and the session's `.betterzcode/evidence/<session id>.jsonl` into the folder as `evidence.jsonl`.
+Copy `scope.json` and the session's `.oh-my-zcode/evidence/<session id>.jsonl` into the folder as `evidence.jsonl`.
 
 ## Step 8: SIGN
 

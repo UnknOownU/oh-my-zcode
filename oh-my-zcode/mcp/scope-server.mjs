@@ -11,7 +11,7 @@
  * hostile agent (plan decision, 2026-08-21).
  *
  * Root resolution replicates projectRoot() from hooks/gate_hook.mjs (l.432):
- * marker walk from process.cwd(), 12-hop cap, home guard, NEAREST .betterzcode
+ * marker walk from process.cwd(), 12-hop cap, home guard, NEAREST .oh-my-zcode
  * ancestor wins, else nearest any-marker ancestor, else null. Same rule as
  * the gate — otherwise the server would report a file the gate never reads
  * (fail-closed, dead feature). If spawned outside a workspace with no
@@ -38,14 +38,14 @@ function samePath(a, b) {
 
 /**
  * Same marker walk as projectRoot() in hooks/gate_hook.mjs.
- * Walks PAST nearer markers to find the nearest .betterzcode ancestor;
+ * Walks PAST nearer markers to find the nearest .oh-my-zcode ancestor;
  * falls back to the nearest any-marker ancestor. Spawned outside any
  * workspace (no marker ancestor) → no root → nothing read or created →
  * the gate stays closed (assumed failure mode, fail-closed direction).
  */
 function resolveProjectRoot(start) {
   const home = homedir();
-  const markers = [".betterzcode", ".git", "package.json", "pyproject.toml", "go.mod", "Cargo.toml"];
+  const markers = [".oh-my-zcode", ".git", "package.json", "pyproject.toml", "go.mod", "Cargo.toml"];
   // Resolve Windows 8.3 short names (e.g. ABDELK~1) to the canonical long
   // form: otherwise the home guard below silently fails when cwd and
   // homedir() spell the same directory differently (measured in harness).
@@ -64,10 +64,10 @@ function resolveProjectRoot(start) {
   let bzRoot = null;
   let markerRoot = null;
   for (let hops = 0; hops < HOP_CAP; hops += 1) {
-    // Never anchor at the user's home: a stray .betterzcode there would
+    // Never anchor at the user's home: a stray .oh-my-zcode there would
     // capture the scope of every project on the machine.
     if (samePath(dir, home)) break;
-    if (existsSync(join(dir, ".betterzcode")) && bzRoot === null) bzRoot = dir;
+    if (existsSync(join(dir, ".oh-my-zcode")) && bzRoot === null) bzRoot = dir;
     if (markerRoot === null) {
       for (const m of markers) {
         if (existsSync(join(dir, m))) { markerRoot = dir; break; }
@@ -102,7 +102,7 @@ class ScopeStore {
     if (!this.root) {
       this.securityDir = this.scopePath = this.grantPath = null;
     } else {
-      this.securityDir = join(this.root, ".betterzcode", "security");
+      this.securityDir = join(this.root, ".oh-my-zcode", "security");
       this.scopePath = join(this.securityDir, "active_scope.json");
       this.grantPath = join(this.securityDir, ".grant");
     }

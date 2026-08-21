@@ -15,7 +15,7 @@
 ## Two hard rules, and why
 
 1. **Never downgrade.** ZCode compares the marketplace version against `plugin.json` (semver sorting) to offer updates — a version below an installed one would never be offered, stranding existing installs. Official docs, verified 2026-08-19.
-2. **Bump BOTH `plugin.json` and `marketplace.json` on every content change.** The validator (`validate_zcode.mjs`, `checkVersionStamp`) hashes all plugin content except `.betterzcode/` and errors on any change without an agreeing bump in both manifests. Content includes docs — a docs-only change is still a patch.
+2. **Bump BOTH `plugin.json` and `marketplace.json` on every content change.** The validator (`validate_zcode.mjs`, `checkVersionStamp`) hashes all plugin content except `.oh-my-zcode/` and errors on any change without an agreeing bump in both manifests. Content includes docs — a docs-only change is still a patch.
 
 ## GitHub tags
 

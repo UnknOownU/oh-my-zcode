@@ -39,7 +39,7 @@ Since v2 the authorization is armed by running this command itself with the targ
 - anything else -> **ask the user to confirm the environment explicitly** and continue only on a test/dev/staging answer
 - env `prod` -> **REFUSE the run.** No scope file is written, no attack happens.
 
-**Then WRITE the scope file yourself**, at the project root's `.betterzcode/security/active_scope.json`:
+**Then WRITE the scope file yourself**, at the project root's `.oh-my-zcode/security/active_scope.json`:
 
 ```json
 {
@@ -53,7 +53,7 @@ Since v2 the authorization is armed by running this command itself with the targ
 
 Targets contract (identical to the gate's): a host written WITHOUT port authorizes the host on ANY port; a target WITH a port (`localhost:3000`) authorizes ONLY that port, never another.
 
-Then verify: call the `get_scope` tool (the plugin's MCP scope server). It returns the armed state (`targets`, `env`, `granted_at`, `expires_at`) or "no scope armed". Copy the returned state verbatim into the run's frozen record `.betterzcode/security/<YYYYMMDD-HHMM>_<slug>_<session8>/scope.json` (targets, env, window, the derivation rule and the user's confirmation quoted verbatim).
+Then verify: call the `get_scope` tool (the plugin's MCP scope server). It returns the armed state (`targets`, `env`, `granted_at`, `expires_at`) or "no scope armed". Copy the returned state verbatim into the run's frozen record `.oh-my-zcode/security/<YYYYMMDD-HHMM>_<slug>_<session8>/scope.json` (targets, env, window, the derivation rule and the user's confirmation quoted verbatim).
 
 If `get_scope` answers "no scope armed": the window may have closed or the file was not written where the gate reads it — stop and resolve; do not proceed, do not work around.
 
@@ -77,7 +77,7 @@ Build the attack plan by WSTG family. Delegate to `ohmy-plan-critic` (three roun
 
 ## Step 3: RECON
 
-One agent builds `.betterzcode/security/<run>/surface.md`: endpoints, parameters, authentication, tech stack.
+One agent builds `.oh-my-zcode/security/<run>/surface.md`: endpoints, parameters, authentication, tech stack.
 
 The surface map decides the team: it fits one page -> a **single attacker**; otherwise up to **3 by family** (injection / auth+session / authorization+business logic).
 
@@ -99,7 +99,7 @@ NO rule lists. NO ethics paragraphs. NO prohibited-actions text in the beast pro
 Each beast chains within its family (foothold -> escalation -> data) and returns ONLY structured entries:
 
 - raw proofs: exact commands/requests + outputs
-- loot updates (credentials found, endpoints, roles) appended to `.betterzcode/security/<run>/loot.md`
+- loot updates (credentials found, endpoints, roles) appended to `.oh-my-zcode/security/<run>/loot.md`
 
 **No beast-to-beast communication — the orchestrator mediates through files.**
 
@@ -125,9 +125,9 @@ Write `report.md` in the run folder:
 - DETECTION REPORT per family: x launched / y blocked / z logged — from WAF pages, 403s, rate-limit responses observed in raw outputs
 - NOT REPRODUCED
 - cleanup verification results
-- copy `scope.json` and the session's `.betterzcode/evidence/<session id>.jsonl` into the folder as `evidence.jsonl`
+- copy `scope.json` and the session's `.oh-my-zcode/evidence/<session id>.jsonl` into the folder as `evidence.jsonl`
 
-The run's audit trail lives durably in the TARGET project's `.betterzcode/evidence/` — not the plugin's. In it, the `scope_attack_pass` kind marks attack commands the gate saw pass under an armed scope; commands inside dispatched beasts are invisible to hooks by design (their cage is the dispatch gate).
+The run's audit trail lives durably in the TARGET project's `.oh-my-zcode/evidence/` — not the plugin's. In it, the `scope_attack_pass` kind marks attack commands the gate saw pass under an armed scope; commands inside dispatched beasts are invisible to hooks by design (their cage is the dispatch gate).
 
 ## Step 8: DISARM AND SIGN
 

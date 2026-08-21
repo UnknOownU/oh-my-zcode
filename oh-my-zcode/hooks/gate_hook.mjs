@@ -425,30 +425,30 @@ function samePath(a, b) {
  *
  * Field incident (2026-08-19, run 20260819-2107, session 63232fdd): the agent
  * worked from lms-booster/, which has its own package.json, so the walk stopped
- * one floor BELOW the real root — the scope gate read .betterzcode at the wrong
+ * one floor BELOW the real root — the scope gate read .oh-my-zcode at the wrong
  * level, fail-closed on a validly armed scope, and the evidence split across
  * two roots. The walk therefore NO LONGER early-returns at the first directory
  * carrying ANY marker: it walks to the hop cap / filesystem root as before,
- * REMEMBERS the first (nearest) directory carrying .betterzcode, and returns
- * that; only when no .betterzcode ancestor exists does it fall back to the
- * previous first-any-marker result. Nearest .betterzcode wins (most-specific
+ * REMEMBERS the first (nearest) directory carrying .oh-my-zcode, and returns
+ * that; only when no .oh-my-zcode ancestor exists does it fall back to the
+ * previous first-any-marker result. Nearest .oh-my-zcode wins (most-specific
  * workspace when both levels carry one).
  *
  * WARNING: reordering the markers array does NOT fix this — the walk must pass
- * OVER nearer markers to find the .betterzcode ancestor.
+ * OVER nearer markers to find the .oh-my-zcode ancestor.
  */
 function projectRoot(payload) {
   const start = payload.cwd || process.cwd();
   const home = homedir();
-  const markers = [".betterzcode", ".git", "package.json", "pyproject.toml", "go.mod", "Cargo.toml"];
+  const markers = [".oh-my-zcode", ".git", "package.json", "pyproject.toml", "go.mod", "Cargo.toml"];
   let dir = start;
-  let bzRoot = null; // nearest ancestor carrying .betterzcode
+  let bzRoot = null; // nearest ancestor carrying .oh-my-zcode
   let markerRoot = null; // nearest ancestor carrying any marker (legacy fallback)
   for (let hops = 0; hops < 12; hops += 1) {
-    // Never anchor at the user's home: a stray .betterzcode there would
+    // Never anchor at the user's home: a stray .oh-my-zcode there would
     // capture the evidence of every project on the machine.
     if (samePath(dir, home)) break;
-    if (existsSync(join(dir, ".betterzcode")) && bzRoot === null) bzRoot = dir;
+    if (existsSync(join(dir, ".oh-my-zcode")) && bzRoot === null) bzRoot = dir;
     if (markerRoot === null) {
       for (const m of markers) {
         if (existsSync(join(dir, m))) { markerRoot = dir; break; }
@@ -462,15 +462,15 @@ function projectRoot(payload) {
 }
 
 /**
- * Where evidence WRITES bootstrap when no .betterzcode ancestor exists.
+ * Where evidence WRITES bootstrap when no .oh-my-zcode ancestor exists.
  *
  * v1.9.3 Verifier finding (bootstrap poisoning): when the walk finds no
- * .betterzcode ancestor, bootstrapping at the NEAREST marker creates an orphan
- * .betterzcode one floor down; nearest-wins resolution then promotes that orphan
+ * .oh-my-zcode ancestor, bootstrapping at the NEAREST marker creates an orphan
+ * .oh-my-zcode one floor down; nearest-wins resolution then promotes that orphan
  * to a permanent shadow of the true root, and a scope validly armed at the real
  * root fail-closes forever. So the bootstrap goes to the WORKSPACE boundary:
  * the HIGHEST ancestor carrying .git (the repository edge), else the HIGHEST
- * ancestor carrying any marker. Once a .betterzcode exists anywhere, resolution
+ * ancestor carrying any marker. Once a .oh-my-zcode exists anywhere, resolution
  * is exactly today's projectRoot and this function changes nothing (reads keep
  * today's projectRoot untouched).
  *
@@ -479,18 +479,18 @@ function projectRoot(payload) {
 function evidenceRoot(payload) {
   const start = payload.cwd || process.cwd();
   const home = homedir();
-  const markers = [".betterzcode", ".git", "package.json", "pyproject.toml", "go.mod", "Cargo.toml"];
+  const markers = [".oh-my-zcode", ".git", "package.json", "pyproject.toml", "go.mod", "Cargo.toml"];
   let dir = start;
-  let bzRoot = null; // nearest ancestor carrying .betterzcode
+  let bzRoot = null; // nearest ancestor carrying .oh-my-zcode
   let gitRoot = null; // HIGHEST ancestor carrying .git
   let markerRoot = null; // HIGHEST ancestor carrying any marker
   for (let hops = 0; hops < 12; hops += 1) {
-    // Never anchor at the user's home: a stray .betterzcode there would
+    // Never anchor at the user's home: a stray .oh-my-zcode there would
     // capture the evidence of every project on the machine.
     if (samePath(dir, home)) break;
-    if (existsSync(join(dir, ".betterzcode")) && bzRoot === null) bzRoot = dir;
+    if (existsSync(join(dir, ".oh-my-zcode")) && bzRoot === null) bzRoot = dir;
     if (existsSync(join(dir, ".git"))) gitRoot = dir; // keep climbing: highest wins
-    if (existsSync(join(dir, ".betterzcode")) || markers.slice(1).some((m) => existsSync(join(dir, m)))) {
+    if (existsSync(join(dir, ".oh-my-zcode")) || markers.slice(1).some((m) => existsSync(join(dir, m)))) {
       markerRoot = dir; // keep climbing: highest wins
     }
     const parent = dirname(dir);
@@ -503,7 +503,7 @@ function evidenceRoot(payload) {
 /** One log per session, addressable from the session id alone. */
 function evidencePath(payload) {
   const sid = String(payload.session_id ?? "").replace(/[^\w.-]/g, "_") || "unknown";
-  return join(evidenceRoot(payload), ".betterzcode", "evidence", `${sid}.jsonl`);
+  return join(evidenceRoot(payload), ".oh-my-zcode", "evidence", `${sid}.jsonl`);
 }
 
 /** Writes the protocol JSON to stdout. Nothing else may go there. */
@@ -821,7 +821,7 @@ function onStop(payload) {
  * The scope gate (PreToolUse/Bash), fourth mechanical gate.
  *
  * An attack command is admissible only against a declared scope: the file
- * <root>/.betterzcode/security/active_scope.json, written by running
+ * <root>/.oh-my-zcode/security/active_scope.json, written by running
  * /ohmy-redteam with the target (the agent has no write path to
  * it since v2), naming the authorised targets, a non-prod env and an expiry.
  * Missing or unparsable file fails CLOSED for attack tools and stays silent
@@ -831,7 +831,7 @@ const SCOPE_POINTER =
   "Scope gate: authorization is armed by running /ohmy-redteam with your target — it expires in 60 minutes.";
 
 function scopeFilePath(payload) {
-  return join(projectRoot(payload), ".betterzcode", "security", "active_scope.json");
+  return join(projectRoot(payload), ".oh-my-zcode", "security", "active_scope.json");
 }
 
 /** Parsed scope file, or null when missing/unparsable. Null = no valid scope. */
@@ -1020,7 +1020,7 @@ function onScope(payload) {
       // command pass under an armed scope" (scope_attack_pass) from plain
       // scoped traffic (scope_pass). Resolution of the LMS BOOSTER ghost
       // scope_pass: the run's real evidence lives in the TARGET project's
-      // .betterzcode/evidence/, and subagent commands are invisible to hooks
+      // .oh-my-zcode/evidence/, and subagent commands are invisible to hooks
       // by design — this kind is what makes the difference auditable.
       log(payload, { kind: isAttack ? "scope_attack_pass" : "scope_pass", command: head });
       return;

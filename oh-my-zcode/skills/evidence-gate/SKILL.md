@@ -50,7 +50,7 @@ when_to_use: when a plan or code change is being verified, routed, or its verdic
     *Against adding agents: Agentless (arXiv 2407.01489) reaches 32.00% on SWE-bench Lite at $0.70 against CodeR's 28.33% at $3.34; MAST (NeurIPS 2025, arXiv 2503.13657) measures 41 to 86.7% failure rates across 7 state-of-the-art multi-agent systems; and the gain is NON-MONOTONIC, since on hard queries more calls degrades the result (NeurIPS 2024, arXiv 2403.02419).*
 
 12. **Mandatory metrics**: correct->incorrect flips, false-OK rate, points consumed, EIR per model.
-    *Two records, two levels of trust. `.betterzcode/evidence/<session>.jsonl` is written by the hooks: the model does not control it, so it is proof. `.betterzcode/plans/<run>/report.md` is written by the agent: it is readable and structured, but it is testimony. The gate reads only the first.*
+    *Two records, two levels of trust. `.oh-my-zcode/evidence/<session>.jsonl` is written by the hooks: the model does not control it, so it is proof. `.oh-my-zcode/plans/<run>/report.md` is written by the agent: it is readable and structured, but it is testimony. The gate reads only the first.*
     *Comparing the two is what makes rule 12 measurable: the report claims a command ran, the hook log says whether it did.*
 
 13. **A subagent's proof cannot sign the main agent's verdict.** Whoever concludes runs the deciding command themselves, in the session that signs.
