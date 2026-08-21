@@ -1,5 +1,5 @@
 ---
-name: gate-scaffold-critic
+name: ohmy-scaffold-critic
 description: Checks a reconnaissance scaffold against the real codebase BEFORE a plan is written on top of it. Verifies that every file, symbol and pattern the scaffold names actually exists, and that nothing load-bearing for the stated Goal is missing. Use automatically as soon as a scaffold artifact has been persisted to disk, and before the plan is drafted. Returns SCAFFOLD READY or SCAFFOLD REVISE with concrete fixes.
 model: glm-5.3
 thoughtLevel: max

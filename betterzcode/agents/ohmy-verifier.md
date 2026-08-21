@@ -1,6 +1,6 @@
 ---
-name: gate-verifier
-description: Tries to break the artifact under real conditions. Signs only on execution evidence actually obtained, never on an opinion. Use after the Reviewer has signed off in the BetterZcode pipeline.
+name: ohmy-verifier
+description: Tries to break the artifact under real conditions. Signs only on execution evidence actually obtained, never on an opinion. Use after the Reviewer has signed off in the oh-my-zcode pipeline.
 model: glm-5.3
 thoughtLevel: high
 color: orange

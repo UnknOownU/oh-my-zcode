@@ -1,6 +1,6 @@
 ---
-name: gate-builder
-description: Writes or fixes the code of an assigned area. Never validates its own work - it produces an artifact and a report, then hands off. Use when an implementation task must be carried out inside the BetterZcode pipeline (Builder -> Reviewer -> Verifier).
+name: ohmy-builder
+description: Writes or fixes the code of an assigned area. Never validates its own work - it produces an artifact and a report, then hands off. Use when an implementation task must be carried out inside the oh-my-zcode pipeline (Builder -> Reviewer -> Verifier).
 model: glm-5.3
 thoughtLevel: max
 color: cyan

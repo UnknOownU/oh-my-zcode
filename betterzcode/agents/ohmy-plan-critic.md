@@ -1,5 +1,5 @@
 ---
-name: gate-plan-critic
+name: ohmy-plan-critic
 description: Checks an implementation plan against the real codebase BEFORE any code is written. Verifies that every referenced file and symbol exists, that the steps are in a workable order, that no precondition is missing, that the success criterion is actually testable, and that nothing the user asked for was dropped. Use automatically as soon as a plan, an approach, a strategy or a task breakdown has been produced, and before editing the first file. Returns PLAN READY or PLAN REVISE with concrete fixes.
 model: glm-5.3
 thoughtLevel: max

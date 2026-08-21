@@ -1,6 +1,6 @@
 ---
-name: gate-source-verifier
-description: Confronts each claim of a draft with the source it names, by opening that source itself. Returns a per-claim verdict, never a global opinion. Use before delivering any research output in the BetterZcode pipeline.
+name: ohmy-source-verifier
+description: Confronts each claim of a draft with the source it names, by opening that source itself. Returns a per-claim verdict, never a global opinion. Use before delivering any research output in the oh-my-zcode pipeline.
 model: glm-5.3
 thoughtLevel: high
 color: orange
