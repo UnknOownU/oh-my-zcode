@@ -2,30 +2,28 @@
 /**
  * oh-my-zcode v2.0.0 — MCP scope server (stdio, zero runtime dependencies).
  *
- * The authorization write path is userConfig (Settings) ONLY: this server
- * READS its config from the spawn env (substituted by ${user_config.*} in
- * plugin.json) and MATERIALIZES the scope files the hooks consume. It never
- * accepts authorization from the agent. Tools: get_scope (read-only) and
- * revoke (fail-closed direction). There is NO authorize tool — PermissionRequest
- * cannot distinguish a user call from an agent call, so an authorize tool would
- * be auto-armable by a hostile agent (plan decision, 2026-08-21).
+ * 2026-08-21, v2 refonte: env-arming is GONE. Arming is BY INVOCATION: the
+ * /ohmy-redteam command flow WRITES active_scope.json itself (v2 shape,
+ * 60-minute window). This server only READS, REPORTS and REVOKES — it never
+ * arms. Tools: get_scope (read-only) and revoke (fail-closed direction).
+ * There is NO authorize tool — PermissionRequest cannot distinguish a user
+ * call from an agent call, so an authorize tool would be auto-armable by a
+ * hostile agent (plan decision, 2026-08-21).
  *
  * Root resolution replicates projectRoot() from hooks/gate_hook.mjs (l.432):
  * marker walk from process.cwd(), 12-hop cap, home guard, NEAREST .betterzcode
- * ancestor wins, else nearest any-marker ancestor, else cwd. Same rule as the
- * gate — otherwise the server would write a file the gate never reads
+ * ancestor wins, else nearest any-marker ancestor, else null. Same rule as
+ * the gate — otherwise the server would report a file the gate never reads
  * (fail-closed, dead feature). If spawned outside a workspace with no
- * SCOPE_ROOT override, nothing is materialized: the gate stays closed.
+ * SCOPE_ROOT override, nothing is read or created: the gate stays closed.
  */
 
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync, unlinkSync } from "node:fs";
-import { createHash } from "node:crypto";
+import { existsSync, readFileSync, realpathSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 
 const SERVER_NAME = "oh-my-zcode-scope";
 const SERVER_VERSION = "2.0.0";
-const VALID_ENVS = new Set(["dev", "staging", "test"]);
 const HOP_CAP = 12;
 
 function log(msg) {
@@ -41,9 +39,8 @@ function samePath(a, b) {
 /**
  * Same marker walk as projectRoot() in hooks/gate_hook.mjs.
  * Walks PAST nearer markers to find the nearest .betterzcode ancestor;
- * falls back to the nearest any-marker ancestor. For the WRITE path (this
- * server) the bare-start fallback of the hook is NOT used: spawned outside
- * any workspace (no marker ancestor) → no root → nothing materialized →
+ * falls back to the nearest any-marker ancestor. Spawned outside any
+ * workspace (no marker ancestor) → no root → nothing read or created →
  * the gate stays closed (assumed failure mode, fail-closed direction).
  */
 function resolveProjectRoot(start) {
@@ -83,39 +80,6 @@ function resolveProjectRoot(start) {
   return bzRoot ?? markerRoot ?? null;
 }
 
-function parseTargets(raw) {
-  if (!raw) return null;
-  const targets = raw.split(",").map((t) => t.trim()).filter((t) => t.length > 0);
-  // 2026-08-21, reviewer finding: reject unsubstituted manifest placeholders.
-  // A partial host substitution (SCOPE_ENV substituted, SCOPE_TARGETS passed
-  // through as the literal "${user_config.scope_targets}") would otherwise arm
-  // a "target" matching no real host. A legitimate hostname never contains "${".
-  if (targets.some((t) => t.includes("${"))) return null;
-  return targets.length > 0 ? targets : null;
-}
-
-function parseMaxAge(raw) {
-  if (raw === undefined || raw === "") return 60; // documented default
-  const n = Number.parseInt(raw, 10);
-  if (!Number.isInteger(n) || n <= 0 || String(n) !== String(raw).trim()) return null;
-  return n;
-}
-
-/** Valid config from spawn env, or null (absent/invalid = unarmed). */
-function readConfig(env) {
-  const targets = parseTargets(env.SCOPE_TARGETS);
-  const scopeEnv = env.SCOPE_ENV;
-  const maxAge = parseMaxAge(env.SCOPE_MAX_AGE_MIN);
-  if (!targets) return null;
-  if (!scopeEnv || !VALID_ENVS.has(scopeEnv)) return null; // "prod"/anything else = unarmed
-  if (maxAge === null) return null;
-  return { targets, env: scopeEnv, maxAge };
-}
-
-function configHash(cfg) {
-  return createHash("sha256").update(JSON.stringify(cfg)).digest("hex");
-}
-
 function readJson(path) {
   try {
     return JSON.parse(readFileSync(path, "utf8"));
@@ -134,7 +98,6 @@ function rm(path) {
 
 class ScopeStore {
   constructor(env) {
-    this.env = env;
     this.root = env.SCOPE_ROOT ? env.SCOPE_ROOT : resolveProjectRoot(process.cwd());
     if (!this.root) {
       this.securityDir = this.scopePath = this.grantPath = null;
@@ -143,54 +106,18 @@ class ScopeStore {
       this.scopePath = join(this.securityDir, "active_scope.json");
       this.grantPath = join(this.securityDir, ".grant");
     }
-    this.config = readConfig(env);
   }
 
   /**
-   * Startup materialization. Valid config → write v2 scope + .grant with a
-   * granted_at STABLE across restarts (same config hash reuses the existing
-   * window; different config opens a new one). Invalid/absent config →
-   * materialize nothing and purge orphan scopes (v2 userConfig + any v1 file
-   * without expires_at — a 1.9.5 scope is transient by design; the upgrade
-   * disarms it).
+   * 2026-08-21, v2 refonte: this server never arms, so startup only purges
+   * orphan scope files it can no longer honor: any v1 file (no expires_at —
+   * a 1.9.5 scope is transient by design; the upgrade disarms it) and any
+   * v2 "userConfig" scope from the retired env-arming path. Scope files
+   * written by invocation (source:"invocation", with expires_at) are left
+   * alone — they belong to the /ohmy-redteam window.
    */
   startup() {
-    if (!this.config || !this.root) {
-      // Unarmed config OR spawned outside any workspace without SCOPE_ROOT:
-      // fail-closed — purge orphans when we DO have a root, never materialize.
-      if (this.root) this.purgeOrphans();
-      return;
-    }
-    const hash = configHash(this.config);
-    const existing = readJson(this.grantPath);
-    const now = new Date();
-    // Same config restart → keep the original granted_at (stable window).
-    // Different config (or corrupted/partial state) → new window.
-    const grantedAt =
-      existing && typeof existing.granted_at === "string" && existing.config_hash === hash
-        ? existing.granted_at
-        : now.toISOString();
-    const expiresAt = new Date(new Date(grantedAt).getTime() + this.config.maxAge * 60000);
-    mkdirSync(this.securityDir, { recursive: true });
-    writeFileSync(
-      this.scopePath,
-      JSON.stringify(
-        {
-          targets: this.config.targets,
-          env: this.config.env,
-          granted_at: grantedAt,
-          expires_at: expiresAt.toISOString(),
-          source: "userConfig"
-        },
-        null,
-        2
-      ) + "\n",
-      "utf8"
-    );
-    writeFileSync(this.grantPath, JSON.stringify({ config_hash: hash, granted_at: grantedAt }, null, 2) + "\n", "utf8");
-  }
-
-  purgeOrphans() {
+    if (!this.root) return; // no workspace root: nothing to purge, nothing to create
     const scope = readJson(this.scopePath);
     if (scope && (scope.source === "userConfig" || typeof scope.expires_at !== "string")) {
       rm(this.scopePath);
@@ -209,22 +136,26 @@ class ScopeStore {
   revoke() {
     if (!this.root) return;
     rm(this.scopePath);
-    rm(this.grantPath);
+    rm(this.grantPath); // harmless if no .grant leftover exists
   }
 }
 
 const HINT =
-  "arm the scope in Settings → Plugins → oh-my-zcode (scope_targets, scope_env, scope_max_age_min), then re-toggle the plugin";
+  "armed by running /ohmy-redteam with your target — expires in 60 minutes";
+
+const EMPTY_SCHEMA = { type: "object", properties: {} };
 
 const TOOLS = [
   {
     name: "get_scope",
     description:
-      "Read the currently materialized security scope (targets, env, window). Read-only; arming happens in Settings (userConfig), never via this server."
+      "Read the current security scope (targets, env, window). Read-only; arming happens by running /ohmy-redteam with your target, never via this server.",
+    inputSchema: EMPTY_SCHEMA
   },
   {
     name: "revoke",
-    description: "Delete the materialized scope and its grant record. Fail-closed direction: always safe for the agent to call."
+    description: "Delete the current scope file (and any grant leftover, harmlessly). Fail-closed direction: always safe for the agent to call.",
+    inputSchema: EMPTY_SCHEMA
   }
 ];
 
@@ -265,7 +196,8 @@ function handleRequest(store, msg) {
           targets: scope.targets,
           env: scope.env,
           granted_at: scope.granted_at,
-          expires_at: scope.expires_at
+          expires_at: scope.expires_at,
+          source: scope.source
         })));
       }
       return rpcResult(id, toolResult(JSON.stringify({ armed: false, hint: HINT })));
@@ -285,7 +217,7 @@ function handleRequest(store, msg) {
 function main() {
   const store = new ScopeStore(process.env);
   store.startup();
-  log(`root=${store.root} armed_config=${store.config ? "yes" : "no"}`);
+  log(`root=${store.root}`);
 
   let buffer = "";
   process.stdin.setEncoding("utf8");
