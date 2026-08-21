@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HOOK = process.argv[2]
-  ?? join(HERE, "betterzcode", "hooks", "gate_hook.mjs");
+  ?? join(HERE, "oh-my-zcode", "hooks", "gate_hook.mjs");
 const RUNTIME = /\.(mjs|js|cjs)$/.test(HOOK) ? "node" : "python";
 
 const WS = mkdtempSync(join(tmpdir(), "gate-"));
@@ -979,7 +979,7 @@ check("25.18 '# nuclei -u https://x.example.com' -> PASSES  (comment node, never
   scopeCmd(`# ${ATTACK}`) === "");
 
 // 25.19 vendor integrity: the vendored parser is frozen byte-for-byte
-const VENDOR = join(HERE, "betterzcode", "hooks", "vendor", "shell-quote");
+const VENDOR = join(HERE, "oh-my-zcode", "hooks", "vendor", "shell-quote");
 const FROZEN_PARSE_SHA256 = "3ba508957858163adbcb7602a9af14cbca77cb0e4d1e86e98e396266f1e56523";
 const parseSha = createHash("sha256").update(readFileSync(join(VENDOR, "parse.js"))).digest("hex");
 check("25.19 vendor parse.js sha256 matches the frozen constant (any accidental touch breaks loudly)",
@@ -1007,7 +1007,7 @@ check("25.21 'sudo -u root grep nuclei README.md' -> PASSES  (grep is the head, 
 // MODEL CHANGE, not a fix: env-arming (SCOPE_* config, .grant materialization)
 // is GONE. Arming is BY INVOCATION — the /ohmy-redteam command writes
 // active_scope.json itself (60-minute window); the plugin's MCP server
-// (betterzcode/mcp/scope-server.mjs, stdio, zero dependency) only READS,
+// (oh-my-zcode/mcp/scope-server.mjs, stdio, zero dependency) only READS,
 // REPORTS and REVOKES. This section spawns the REAL server over stdio
 // (JSON-RPC 2.0, line-delimited, SCOPE_ROOT-controlled temp roots) and
 // freezes: the published-defect fix (inputSchema on tools/list — without it
@@ -1016,7 +1016,7 @@ check("25.21 'sudo -u root grep nuclei README.md' -> PASSES  (grep is the head, 
 // (`command -v`, tag freeze).
 // ---------------------------------------------------------------------------
 
-const SERVER = join(HERE, "betterzcode", "mcp", "scope-server.mjs");
+const SERVER = join(HERE, "oh-my-zcode", "mcp", "scope-server.mjs");
 // Arming env no longer exists; SCOPE_* is stripped from the parent env so
 // spawns are clean — only explicit SCOPE_ROOT overrides are ever passed.
 const stripScopeEnv = (env) => {

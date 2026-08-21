@@ -413,7 +413,7 @@ function checkEncoding(root) {
 }
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const root = process.argv[2] ?? join(HERE, "betterzcode");
+const root = process.argv[2] ?? join(HERE, "oh-my-zcode");
 if (!existsSync(root)) {
   console.log(`plugin not found: ${root}`);
   process.exit(2);
