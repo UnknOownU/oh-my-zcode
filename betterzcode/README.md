@@ -34,7 +34,7 @@
 
 | Method | How |
 |---|---|
-| Local marketplace | **Settings → Plugins → Create → Add marketplace**, point it at the folder containing `marketplace.json` (the parent of this one), then install `betterzcode` from the **Personal** tab |
+| Local marketplace | **Settings → Plugins → Create → Add marketplace**, point it at the folder containing `marketplace.json` (the parent of this one), then install `oh-my-zcode` from the **Personal** tab. Migration from 1.x: uninstall `betterzcode` first (breaking rename); a 1.9.5 scope left armed mid-run is disarmed at the first v2 server start — fail-closed by design |
 | GitHub | Push the folder to a repository (ours: <https://github.com/UnknOownU/oh-my-zcode>), then **Add marketplace** with the repository URL |
 
 > [!NOTE]
@@ -76,7 +76,7 @@ Locks the scope in writing before anything is touched (`scope.json`). Runs recon
 
 ### /betterredteam
 
-The environment gate comes first: test/dev or nothing — the run does not start outside an authorized scope. 🟣 `gate-plan-critic` checks the attack plan against the doctrine before anything is dispatched. The beasts are dispatched attackers that receive target and objective only — the cage (the `PreToolUse` scope gate, token-matched attack commands and tagged red-team subagent dispatches via Agent/Task: env ≠ prod, matching session, matching hosts) enforces every constraint, not their own restraint. Impact is proven by sample or by controlled callback. 🟠 `gate-finding-verifier` re-executes each demonstrated impact blind and re-verifies cleanup. The run ends with a detection report per attack family (x detected / y suspicious / z clean). The cage is a guardrail, not an authorization oracle — hooks see main-session commands and dispatches, not subagent internals, and the agent could write `active_scope.json` itself; it raises the bar mechanically, it does not replace the operator's judgment.
+The environment gate comes first: test/dev or nothing — the run does not start outside an authorized scope. 🟣 `gate-plan-critic` checks the attack plan against the doctrine before anything is dispatched. The beasts are dispatched attackers that receive target and objective only — the cage (the `PreToolUse` scope gate, token-matched attack commands and tagged red-team subagent dispatches via Agent/Task: env ≠ prod, matching session, matching hosts) enforces every constraint, not their own restraint. Impact is proven by sample or by controlled callback. 🟠 `gate-finding-verifier` re-executes each demonstrated impact blind and re-verifies cleanup. The run ends with a detection report per attack family (x detected / y suspicious / z clean). The cage is a guardrail, not an authorization oracle — hooks see main-session commands and dispatches, not subagent internals, and authorization now lives in Settings (the agent has no tool to write it): a hostile agent could still forge the `active_scope.json` file itself; the bar is raised and the residual risk documented — it raises the bar mechanically, it does not replace the operator's judgment.
 
 ```
 /betterredteam https://staging.ourapp.io — full chain, we own staging
@@ -91,7 +91,7 @@ You do not have to use any of them. The `SessionStart` hook injects the doctrine
 | **Evidence** | `Stop` | `VERDICT: PASS` without a verification command executed this turn |
 | **Citation** | `Stop` | `SOURCES: VERIFIED` citing a URL never fetched this session (failed fetches never count) |
 | **Findings** | `Stop` | `FINDINGS: VERIFIED` without a verification command this turn |
-| **Scope** | `PreToolUse` | attack commands (token-matched — quotes, wrappers, pipes and `$(…)` cannot hide the tool word) without an armed test/dev scope (env ≠ prod, matching session, matching hosts — and tagged red-team subagent dispatches, Agent/Task) |
+| **Scope** | `PreToolUse` | attack commands (token-matched — quotes, wrappers, pipes and `$(…)` cannot hide the tool word) without a user-armed test/dev scope — armed via Settings (`userConfig`), expiring automatically; token-matched commands and tagged red-team subagent dispatches (Agent/Task) |
 
 ## Who does what
 
@@ -130,7 +130,7 @@ Set `max_tokens` to **131072** — the documented ceiling — and never below. Y
 ├── plans/<run>/                    scaffold.md, plan.md, report.md, evidence.jsonl
 ├── research/<run>/                 report.md, evidence.jsonl
 └── security/
-    ├── active_scope.json           transient scope authorization, deleted at run end
+    ├── active_scope.json           materialized by the plugin's MCP server from Settings; expires automatically
     ├── loot.md                     the chain ledger
     └── <run>/                      scope.json, surface.md, report.md, evidence.jsonl
 ```
@@ -159,11 +159,11 @@ Both tools are dependency-free and require no build step.
 
 ### Versioning
 
-Versioning follows [docs/versioning.md](docs/versioning.md) — the 1.x line continues; 2.0.0 is reserved for the MCP release.
+Versioning follows [docs/versioning.md](docs/versioning.md) — the 1.x line continues; the 2.0.0 reservation was fulfilled by the MCP release (2026-08-21).
 
 ## Uninstalling
 
-**Settings → Plugins → betterzcode → uninstall.** Run data stays in `.betterzcode/`.
+**Settings → Plugins → oh-my-zcode → uninstall.** Run data stays in `.betterzcode/`. Migration from 1.x: uninstall `betterzcode` before installing `oh-my-zcode`; a 1.9.5 scope left armed mid-run is disarmed at the first v2 server start — fail-closed by design.
 
 ## License
 
