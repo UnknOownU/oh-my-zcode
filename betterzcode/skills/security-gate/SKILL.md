@@ -1,6 +1,6 @@
 ---
 name: security-gate
-description: Doctrine of evidence-gated security testing for GLM agents, grounded in measurements. Load it when a security assessment, pentest or red-team run is being planned or discussed, when findings are reported, or when configuring the /bettersecurity pipeline.
+description: Doctrine of evidence-gated security testing for GLM agents, grounded in measurements. Load it when a security assessment, pentest or red-team run is being planned or discussed, when findings are reported, or when configuring the /ohmy-security pipeline.
 when_to_use: when any security test or red-team run is being planned, executed, or reported
 ---
 
