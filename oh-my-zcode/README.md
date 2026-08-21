@@ -96,7 +96,7 @@ You do not have to use any of them. The `SessionStart` hook injects the doctrine
 
 ## The MCP servers
 
-The plugin ships **four** MCP servers, declared in [`.zcode-plugin/plugin.json`](.zcode-plugin/plugin.json) — the official ZCode nomenclature, measured registering at cold start (2026-08-21). Measured law: the host reads plugin MCP declarations **only at app start** — install or update the plugin, then restart ZCode, or the servers will not appear in the session.
+The plugin ships **five** MCP servers, declared in [`.zcode-plugin/plugin.json`](.zcode-plugin/plugin.json) — the official ZCode nomenclature, measured registering at cold start (2026-08-21). Measured law: the host reads plugin MCP declarations **only at app start** — install or update the plugin, then restart ZCode, or the servers will not appear in the session.
 
 | Server | Transport | What it is |
 |---|---|---|

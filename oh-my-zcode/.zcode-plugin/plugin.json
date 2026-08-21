@@ -50,6 +50,15 @@
     "grep": {
       "type": "http",
       "url": "https://mcp.grep.app"
+    },
+    "codegraph": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${ZCODE_PLUGIN_ROOT}/vendor/codegraph/node_modules/@colbymchenry/codegraph/npm-shim.js",
+        "serve",
+        "--mcp"
+      ]
     }
   }
 }

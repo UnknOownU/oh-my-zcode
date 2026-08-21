@@ -74,7 +74,7 @@ function walk(dir) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
     // Skip .oh-my-zcode runtime dir: run artifacts in the dev workspace mutated the digest with no content change (README says gitignore it).
-    if (name === ".oh-my-zcode") continue;
+    if (name === ".oh-my-zcode" || name === "node_modules") continue;  // node_modules: vendored binaries (wasm/.node/exe) are not UTF-8 by design
     if (statSync(p).isDirectory()) out.push(...walk(p));
     else out.push(p);
   }
@@ -129,8 +129,8 @@ function checkManifest(root) {
 function checkMcpServers(root, man) {
   if (!man.mcpServers) return;
   const servers = Object.entries(man.mcpServers);
-  if (servers.length !== 4) {
-    err(`mcpServers : expected 4 servers (scope, semgrep, osv-scanner, grep), got ${servers.length}`);
+  if (servers.length !== 5) {
+    err(`mcpServers : expected 5 servers (scope, semgrep, osv-scanner, grep, codegraph), got ${servers.length}`);
   }
   ok(`mcpServers : ${servers.length} server(s) declared`);
   for (const [id, srv] of servers) {
@@ -159,7 +159,9 @@ function checkMcpServers(root, man) {
     if (existsSync(join(root, rel))) {
       ok(`mcpServers.${id} : target script present (${rel})`);
     } else {
-      err(`mcpServers.${id} : target script not found (${rel})`);
+      rel.includes("vendor/codegraph")
+        ? warn(`mcpServers.${id} : vendored shim not bootstrapped — run tools/setup-codegraph.cmd (one local command, no global install, no PATH)`)
+        : err(`mcpServers.${id} : target script not found (${rel})`);
     }
   }
 }
