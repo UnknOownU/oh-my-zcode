@@ -16,7 +16,7 @@
  *                   dev/staging/test, matching session) exists, and confines
  *                   every URL a scoped session touches to the declared targets.
  *   dispatch      : the dispatch gate (PreToolUse/Agent|Task). A tagged
- *                   red-team subagent dispatch ([betterredteam <run-id>]) is
+ *                   red-team subagent dispatch ([ohmy-redteam <run-id>]) is
  *                   admissible only under a valid armed scope; every other
  *                   dispatch is never touched (zero interference by
  *                   construction — detection is by routing tag, not language).
@@ -51,8 +51,9 @@ const DOCTRINE =
   "the Reviewer judges in a fresh context, the Verifier proves by executing. " +
   "Hard rule: whoever produces an artifact never signs its own verdict. " +
   "A plan is never executed before it is checked: as soon as an implementation " +
-  "plan, an approach or a task breakdown is produced, have gate-plan-critic " +
-  "verify it against the codebase before the first file is edited. " +
+  "plan, an approach or a task breakdown is produced, have ohmy-plan-critic " +
+  "verify it against the codebase before the first file is edited — the " +
+  "orchestrator relays: dedicated writers produce the scaffold and the plan. " +
   "Before you sign off, run the deciding command yourself, in this session: a " +
   "subagent's commands are not traceable from here, so its proof cannot back " +
   "your signature. Delegate the work, own the verdict. " +
@@ -204,6 +205,13 @@ function unwrapHead(segWords, i) {
     if (ASSIGNMENT_RE.test(w)) { i++; continue; } // FOO=1 nuclei → skip prefix
     const lower = w.toLowerCase();
     if (WRAPPERS.has(lower)) {
+      // 2026-08-21 debt fix: `command -v X` / `command -V X` resolves a NAME,
+      // it never executes X — found live when the gate blocked its own
+      // diagnostics. The whole segment is a name resolution: skip it (no
+      // unwrap to a command head), and only for this exact wrapper+flag pair.
+      if (lower === "command" && i + 1 < segWords.length && (segWords[i + 1] === "-v" || segWords[i + 1] === "-V")) {
+        return out;
+      }
       // 2026-08-20, reviewer finding: the wrapper's own flags (and the VALUE
       // some of them take) are not the command. Skip every "-…" token after
       // the wrapper; a short flag in WRAPPER_VALUE_FLAGS (exact `-u` form)
@@ -813,14 +821,14 @@ function onStop(payload) {
  * The scope gate (PreToolUse/Bash), fourth mechanical gate.
  *
  * An attack command is admissible only against a declared scope: the file
- * <root>/.betterzcode/security/active_scope.json, materialized by the plugin's
- * MCP scope server from the Settings fields (the agent has no write path to
+ * <root>/.betterzcode/security/active_scope.json, written by running
+ * /ohmy-redteam with the target (the agent has no write path to
  * it since v2), naming the authorised targets, a non-prod env and an expiry.
  * Missing or unparsable file fails CLOSED for attack tools and stays silent
  * for everything else — a normal dev session must feel zero interference.
  */
 const SCOPE_POINTER =
-  "Scope gate: authorization is armed in Settings → Plugins → oh-my-zcode (scope fields) — /betterredteam walks you through it.";
+  "Scope gate: authorization is armed by running /ohmy-redteam with your target — it expires in 60 minutes.";
 
 function scopeFilePath(payload) {
   return join(projectRoot(payload), ".betterzcode", "security", "active_scope.json");
@@ -847,7 +855,7 @@ function readScopeFile(payload) {
  */
 function scopeExpiredReason(scope) {
   if (scope.expires_at === undefined || scope.expires_at === null) {
-    return "scope expired (pre-v2 scope file without expires_at — re-arm via Settings)";
+    return "scope expired (pre-v2 scope file without expires_at — re-arm by running /ohmy-redteam with your target)";
   }
   const t = Date.parse(scope.expires_at);
   if (Number.isNaN(t) || t <= Date.now()) return `scope expired at ${scope.expires_at}`;
@@ -1069,7 +1077,7 @@ function onScope(payload) {
 // Detection is by routing tag, not language: any intent regex matches pipeline
 // prompts that quote plan/fixture text, and the gate would have blocked its own
 // construction (plan-critic round 1, 2026-08-19). The tag is the only trigger.
-const DISPATCH_TAG_RE = /\[betterredteam[^\]]*\]/i;
+const DISPATCH_TAG_RE = /\[ohmy-redteam[^\]]*\]/i;
 
 function dispatchBlock(payload, reason, prompt) {
   log(payload, { kind: "dispatch_block", reason, prompt: String(prompt).slice(0, 200) });
