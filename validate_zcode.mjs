@@ -87,14 +87,12 @@ function onPath(cmd) {
 }
 
 function checkManifest(root) {
-  if (existsSync(join(root, ".zcode-plugin"))) {
-    err("leftover .zcode-plugin/ is ignored by the runtime — delete it "
-      + "(mcpServers declared there were silently ignored, 2026-08-21 measurements)");
+  if (existsSync(join(root, ".claude-plugin"))) {
+    err("leftover .claude-plugin/ — the plugin ships the official .zcode-plugin form; delete it");
   }
-  const path = join(root, ".claude-plugin", "plugin.json");
+  const path = join(root, ".zcode-plugin", "plugin.json");
   if (!existsSync(path)) {
-    err("manifest .claude-plugin/plugin.json missing "
-      + "(the runtime registers MCP servers only from the .claude-plugin manifest)");
+    err("manifest .zcode-plugin/plugin.json missing");
     return {};
   }
   let man;
@@ -104,7 +102,7 @@ function checkManifest(root) {
     err(`plugin.json : invalid JSON (${e.message})`);
     return {};
   }
-  ok("manifest .claude-plugin/plugin.json is valid");
+  ok("manifest .zcode-plugin/plugin.json is valid");
   for (const k of ["name", "version", "description"]) {
     if (!man[k]) err(`plugin.json : field '${k}' missing`);
   }
