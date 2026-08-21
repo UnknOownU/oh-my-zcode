@@ -1,6 +1,6 @@
 {
-  "name": "betterzcode",
-  "version": "1.9.5",
+  "name": "oh-my-zcode",
+  "version": "2.0.0",
   "description": "Your agent cannot call a task done without proving it, and cannot cite a source it never opened. Separate agents check the plan, write the code, review it and verify it by execution; hooks block any success verdict no executed test supports, any report citing a page that was never fetched, and in security runs a finding enters the report only once independently reproduced — the hooks block a FINDINGS: VERIFIED signature when no verification command ran, and a red-team impact mode whose attack commands a PreToolUse gate physically blocks until a test/dev scope is authorized. An agent that writes is never an agent that judges.",
   "author": {
     "name": "UnknOownU",
@@ -24,5 +24,37 @@
   ],
   "agents": "agents",
   "commands": "commands",
-  "skills": "skills"
+  "skills": "skills",
+  "mcpServers": {
+    "scope": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${ZCODE_PLUGIN_ROOT}/mcp/scope-server.mjs"
+      ],
+      "env": {
+        "SCOPE_TARGETS": "${user_config.scope_targets}",
+        "SCOPE_ENV": "${user_config.scope_env}",
+        "SCOPE_MAX_AGE_MIN": "${user_config.scope_max_age_min}"
+      }
+    }
+  },
+  "userConfig": {
+    "scope_targets": {
+      "type": "string",
+      "title": "Scope targets (comma-separated hosts)",
+      "description": "Hosts the security scope covers, e.g. x.example.com,y.example.com"
+    },
+    "scope_env": {
+      "type": "string",
+      "title": "Scope environment (dev|staging|test)",
+      "description": "Environment of the scoped targets. prod or any other value leaves the scope unarmed (fail-closed)."
+    },
+    "scope_max_age_min": {
+      "type": "string",
+      "title": "Scope window (minutes)",
+      "description": "Lifetime of an armed scope in minutes. The window opens when the config is saved and expires automatically.",
+      "default": "60"
+    }
+  }
 }
