@@ -503,9 +503,10 @@ check("marker with ZERO verification commands the whole session -> BLOCKS",
 const scopeFile = () => join(WS, ".betterzcode", "security", "active_scope.json");
 // UPDATED 2026-08-21 (v2.0.0 model change): fixtures are v2-format
 // {targets, env, granted_at, expires_at, source}. Expiry windows REPLACE the
-// v1.9.5 session binding — authorization is armed by the user in Settings and
-// materialized by the MCP scope server; session_id is gone from the file.
-// Defaults: granted_at = now, expires_at = +60 min (both ISO).
+// v1.9.5 session binding — authorization is armed BY INVOCATION (the
+// /ohmy-redteam command writes the file, 60-minute window); session_id is
+// gone from the file. Defaults: granted_at = now, expires_at = +60 min,
+// source = "invocation" (overridable — 26.6 needs a v1 orphan, not this).
 const writeScope = (s) => {
   const grantedAt = s.granted_at ?? new Date().toISOString();
   const expiresAt = s.expires_at
@@ -516,7 +517,7 @@ const writeScope = (s) => {
     env: s.env,
     granted_at: grantedAt,
     expires_at: expiresAt,
-    source: s.source ?? "userConfig",
+    source: s.source ?? "invocation",
   }), "utf8");
 };
 // An EXPIRED window (deterministic past dates, never "now - epsilon") for the
@@ -660,7 +661,8 @@ check("host-mismatch block reason CONTAINS the offending host",
 
 // ---------------------------------------------------------------------------
 // 23. DISPATCH GATE (PreToolUse/Agent|Task)
-// A tagged red-team dispatch ([betterredteam <run-id>]) is admissible only
+// UPDATED 2026-08-21 (v2 refonte): the routing tag is [ohmy-redteam <run-id>]
+// (DISPATCH_TAG_RE /\[ohmy-redteam[^\]]*\]/i). A tagged red-team dispatch
 // under a valid armed scope, and while one is armed every URL host in the
 // prompt must land inside the targets. Untagged dispatches are NEVER touched,
 // whatever their text — zero interference by construction (detection is by
@@ -670,10 +672,10 @@ check("host-mismatch block reason CONTAINS the offending host",
 const dispatch = (prompt, extra = {}) =>
   run("dispatch", {
     tool_name: "Agent",
-    tool_input: { prompt, description: prompt, subagent_type: "betterredteam-beast" },
+    tool_input: { prompt, description: prompt, subagent_type: "ohmy-redteam-beast" },
     ...extra,
   });
-const TAGGED = "[betterredteam 20260819-2048] run nuclei against https://x.example.com";
+const TAGGED = "[ohmy-redteam 20260821-0900] run nuclei against https://x.example.com";
 
 // 23.1 tagged dispatch, no scope file at all -> fail closed
 reset();
@@ -685,7 +687,9 @@ writeScope({ targets: ["x.example.com"], env: "dev" });
 check("tagged dispatch under a valid scope -> passes (no output)",
   dispatch(TAGGED) === "");
 check("...and the pass is logged as kind=dispatch_pass",
-  readFileSync(evidenceFile(), "utf8").includes('"kind":"dispatch_pass"'));
+  existsSync(evidenceFile())
+  && readFileSync(evidenceFile(), "utf8").includes('"kind":"dispatch_pass"'),
+  `expected ${evidenceFile()} (a missing log is a FAIL, never a crash)`);
 
 // 23.3 ZERO-INTERFERENCE FREEZES (the contract): untagged dispatches quoting
 // this plan's own text verbatim are never touched, no scope armed.
@@ -722,7 +726,7 @@ check("...and the reason contains 'expired'",
 // 23.6 an armed scope confines the prompt: an out-of-scope host blocks
 reset();
 writeScope({ targets: ["x.example.com"], env: "dev" });
-const offTarget = dispatch("[betterredteam 20260819-2048] run nuclei against https://other.example.com");
+const offTarget = dispatch("[ohmy-redteam 20260821-0900] run nuclei against https://other.example.com");
 check("armed scope + tagged prompt naming an out-of-scope host -> BLOCKS",
   blocked(offTarget));
 check("...and the reason contains the offending host",
@@ -754,16 +758,19 @@ writeFileSync(scopeFile(), "\x00\x01 not json \x02", "utf8");
 check("garbage active_scope.json + tagged dispatch -> BLOCKS (fail closed)",
   blocked(dispatch(TAGGED)));
 
-// 23.9 every block reason carries the /betterredteam pointer
+// 23.9 every block reason carries the /ohmy-redteam pointer
+// (UPDATED 2026-08-21, v2 refonte: SCOPE_POINTER names /ohmy-redteam)
 reset();
 deleteScope();
 const noScopeBlock = dispatch(TAGGED);
-check("every block reason contains '/betterredteam'",
-  blocked(noScopeBlock) && blockReason(noScopeBlock).includes("/betterredteam"));
+check("every block reason contains '/ohmy-redteam'",
+  blocked(noScopeBlock) && blockReason(noScopeBlock).includes("/ohmy-redteam"));
 
 // 23.10 a blocked tagged dispatch lands in the evidence log
 check("a blocked tagged dispatch is logged as kind=dispatch_block",
-  readFileSync(evidenceFile(), "utf8").includes('"kind":"dispatch_block"'));
+  existsSync(evidenceFile())
+  && readFileSync(evidenceFile(), "utf8").includes('"kind":"dispatch_block"'),
+  `expected ${evidenceFile()} (a missing log is a FAIL, never a crash)`);
 
 // 23.11 the tag is inherited: the passing path emits NOTHING (no rewriting —
 // the tag/prompt reach the beast unchanged)
@@ -996,30 +1003,47 @@ check("25.21 'sudo -u root grep nuclei README.md' -> PASSES  (grep is the head, 
   scopeCmd("sudo -u root grep nuclei README.md") === "");
 
 // ---------------------------------------------------------------------------
-// 26. v2.0.0 MCP SCOPE SERVER (2026-08-21 model change)
-// « oh-my-zcode » v2.0.0 moved the authorization out of the agent's hands:
-// expiry windows REPLACE the session binding, arming lives in the Settings
-// (userConfig — the only write path the agent does not have), and the plugin's
-// MCP server (betterzcode/mcp/scope-server.mjs, stdio, zero dependency)
-// materializes active_scope.json for the hooks. This section spawns the REAL
-// server over stdio (JSON-RPC 2.0, line-delimited), freezes the gate expiry
-// semantics, the surgical disarm (updatedInput), and the root resolution.
+// 26. v2.0.0 MCP SCOPE SERVER — REWRITTEN 2026-08-21 (v2 refonte)
+// MODEL CHANGE, not a fix: env-arming (SCOPE_* config, .grant materialization)
+// is GONE. Arming is BY INVOCATION — the /ohmy-redteam command writes
+// active_scope.json itself (60-minute window); the plugin's MCP server
+// (betterzcode/mcp/scope-server.mjs, stdio, zero dependency) only READS,
+// REPORTS and REVOKES. This section spawns the REAL server over stdio
+// (JSON-RPC 2.0, line-delimited, SCOPE_ROOT-controlled temp roots) and
+// freezes: the published-defect fix (inputSchema on tools/list — without it
+// the server never registers), the read/revoke contract, the startup purge
+// of pre-v2 orphans, root resolution, and the two 2026-08-21 hook debts
+// (`command -v`, tag freeze).
 // ---------------------------------------------------------------------------
 
 const SERVER = join(HERE, "betterzcode", "mcp", "scope-server.mjs");
+// Arming env no longer exists; SCOPE_* is stripped from the parent env so
+// spawns are clean — only explicit SCOPE_ROOT overrides are ever passed.
 const stripScopeEnv = (env) => {
   const e = { ...env };
   for (const k of Object.keys(e)) if (k.startsWith("SCOPE_")) delete e[k];
   return e;
 };
-const ARM_ENV = { SCOPE_TARGETS: "x.example.com", SCOPE_ENV: "test", SCOPE_MAX_AGE_MIN: "60" };
+// Deterministic v2 invocation fixture: fixed ISO dates, never "now ± epsilon".
+const INVOCATION_SCOPE = {
+  targets: ["x.example.com"],
+  env: "staging",
+  granted_at: "2026-08-21T00:00:00Z",
+  expires_at: "2099-01-01T00:00:00Z",
+  source: "invocation",
+};
+const EXPIRED_INVOCATION_SCOPE = {
+  ...INVOCATION_SCOPE,
+  granted_at: "2019-01-01T00:00:00Z",
+  expires_at: "2020-01-01T00:00:00Z",
+};
 // One spawn, several frames: every frame is answered on stdout, keyed by id.
 const rpc = (frames, opts = {}) => {
   const p = spawnSync("node", [SERVER], {
     input: frames.map((f) => JSON.stringify(f)).join("\n") + "\n",
     encoding: "utf8",
     cwd: opts.cwd ?? WS,
-    env: opts.unarmed ? stripScopeEnv(process.env) : { ...process.env, ...opts.env },
+    env: { ...stripScopeEnv(process.env), ...opts.env },
   });
   if (p.status !== 0) throw new Error(`scope-server exited ${p.status}: ${p.stderr}`);
   const byId = new Map();
@@ -1034,128 +1058,176 @@ const rpc = (frames, opts = {}) => {
   return byId;
 };
 const INIT = { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "test_gate", version: "0" } } };
+const GET_SCOPE = (id) => ({ jsonrpc: "2.0", id, method: "tools/call", params: { name: "get_scope", arguments: {} } });
 const toolText = (resp) => {
   const t = resp?.result?.content?.[0]?.text;
   try { return JSON.parse(t); } catch { return null; }
 };
 const srvScopePath = (root) => join(root, ".betterzcode", "security", "active_scope.json");
 const srvGrantPath = (root) => join(root, ".betterzcode", "security", ".grant");
+const writeServerScope = (root, scope) => {
+  mkdirSync(join(root, ".betterzcode", "security"), { recursive: true });
+  writeFileSync(srvScopePath(root), JSON.stringify(scope), "utf8");
+};
 
-// 26.1-26.2 handshake + exact tool set, on an ARMED spawn in a fresh workspace
+// 26.1-26.2 handshake + exact tool set, in a fresh UNARMED workspace
 const SRV = mkdtempSync(join(tmpdir(), "gate-srv-"));
 writeFileSync(join(SRV, "package.json"), "{}\n");
 const hs = rpc([
   INIT,
   { jsonrpc: "2.0", id: 2, method: "tools/list" },
-], { cwd: SRV, env: ARM_ENV });
+], { cwd: SRV });
 check("26.1 initialize handshake answers with serverInfo",
   hs.get(1)?.result?.serverInfo?.name === "oh-my-zcode-scope"
   && hs.get(1)?.result?.serverInfo?.version === "2.0.0",
   JSON.stringify(hs.get(1)?.result?.serverInfo));
+const listedTools = hs.get(2)?.result?.tools ?? [];
 check("26.2 tools/list = exactly get_scope + revoke (no authorize tool)",
-  JSON.stringify((hs.get(2)?.result?.tools ?? []).map((t) => t.name).sort())
+  JSON.stringify(listedTools.map((t) => t.name).sort())
     === JSON.stringify(["get_scope", "revoke"]),
-  JSON.stringify((hs.get(2)?.result?.tools ?? []).map((t) => t.name)));
+  JSON.stringify(listedTools.map((t) => t.name)));
+check("26.2 ...and EVERY tool carries inputSchema {type:'object',properties:{}}  (the published-defect fix, frozen 2026-08-21)",
+  listedTools.length === 2
+  && listedTools.every((t) =>
+    JSON.stringify(t.inputSchema) === JSON.stringify({ type: "object", properties: {} })),
+  JSON.stringify(listedTools.map((t) => t.inputSchema)));
 
-// 26.4 the armed spawn materialized the v2 scope file
-const matScope = JSON.parse(readFileSync(srvScopePath(SRV), "utf8"));
-check("26.4 armed spawn materializes {targets, env, granted_at, expires_at, source:'userConfig'}",
-  JSON.stringify(matScope.targets) === JSON.stringify(["x.example.com"])
-  && matScope.env === "test"
-  && typeof matScope.granted_at === "string"
-  && typeof matScope.expires_at === "string"
-  && matScope.source === "userConfig",
-  JSON.stringify(matScope));
-check("26.4 ...and the window is exactly SCOPE_MAX_AGE_MIN = 60 minutes",
-  Math.round((new Date(matScope.expires_at) - new Date(matScope.granted_at)) / 60000) === 60);
-
-// 26.3 UNARMED (no config env): get_scope says so and points at Settings
-const SRV2 = mkdtempSync(join(tmpdir(), "gate-srv2-"));
-writeFileSync(join(SRV2, "package.json"), "{}\n");
+// 26.3 UNARMED (no scope file — arming is by invocation, never by this
+// server): get_scope says so and points at /ohmy-redteam
 const unarmed = rpc([
   INIT,
-  { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "get_scope", arguments: {} } },
-], { cwd: SRV2, unarmed: true });
+  GET_SCOPE(3),
+], { cwd: SRV });
 const unarmedState = toolText(unarmed.get(3));
-check("26.3 unarmed spawn: get_scope -> armed:false + Settings hint",
-  unarmedState?.armed === false && String(unarmedState?.hint ?? "").includes("Settings"),
+check("26.3 unarmed: get_scope -> armed:false + hint pointing at /ohmy-redteam",
+  unarmedState?.armed === false && String(unarmedState?.hint ?? "").includes("/ohmy-redteam"),
   JSON.stringify(unarmedState));
 
-// 26.5 RESTART with the same config: granted_at is STABLE (same window)
-const grantedBefore = matScope.granted_at;
-rpc([INIT], { cwd: SRV, env: ARM_ENV });
-check("26.5 restart with the same config keeps granted_at identical (.grant reuse)",
-  JSON.parse(readFileSync(srvScopePath(SRV), "utf8")).granted_at === grantedBefore);
+// 26.4 an invocation scope WRITTEN BY THE TEST (what /ohmy-redteam produces)
+// is reported armed, verbatim — the server reads, it never arms
+writeServerScope(SRV, INVOCATION_SCOPE);
+const armed = rpc([INIT, GET_SCOPE(4)], { cwd: SRV });
+const armedState = toolText(armed.get(4));
+check("26.4 invocation scope -> get_scope armed:true with targets/env/granted_at/expires_at/source",
+  armedState?.armed === true
+  && JSON.stringify(armedState?.targets) === JSON.stringify(["x.example.com"])
+  && armedState?.env === "staging"
+  && armedState?.granted_at === INVOCATION_SCOPE.granted_at
+  && armedState?.expires_at === INVOCATION_SCOPE.expires_at
+  && armedState?.source === "invocation",
+  JSON.stringify(armedState));
 
-// 26.6 config CHANGED -> a new window opens (granted_at moves); still armed.
-// Short restart gap so two ISO timestamps can never collide.
-Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1100);
-const changed = rpc([
-  INIT,
-  { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "get_scope", arguments: {} } },
-], { cwd: SRV, env: { ...ARM_ENV, SCOPE_ENV: "staging" } });
-const changedScope = JSON.parse(readFileSync(srvScopePath(SRV), "utf8"));
-check("26.6 config changed -> granted_at moves (new window)",
-  changedScope.granted_at !== grantedBefore);
-check("26.6 ...and get_scope reports armed:true with the new env",
-  toolText(changed.get(4))?.armed === true && toolText(changed.get(4))?.env === "staging",
-  JSON.stringify(toolText(changed.get(4))));
+// 26.5 EXPIRED invocation scope: not armed, hint, and the FILE IS LEFT IN
+// PLACE (revoke is the only delete path; the read must not mutate the disk)
+const SRV2 = mkdtempSync(join(tmpdir(), "gate-srv2-"));
+writeFileSync(join(SRV2, "package.json"), "{}\n");
+writeServerScope(SRV2, EXPIRED_INVOCATION_SCOPE);
+const expiredSrv = rpc([INIT, GET_SCOPE(5)], { cwd: SRV2 });
+const expiredState = toolText(expiredSrv.get(5));
+check("26.5 expired scope -> get_scope armed:false + hint",
+  expiredState?.armed === false && String(expiredState?.hint ?? "").includes("/ohmy-redteam"),
+  JSON.stringify(expiredState));
+check("26.5 ...and the expired file is LEFT IN PLACE (read path never deletes)",
+  existsSync(srvScopePath(SRV2)));
 
-// 26.7a a pre-placed v1 orphan (no expires_at) is purged at startup (unarmed)
+// 26.6 pre-v2 orphan (no expires_at): purged at STARTUP (upgrade disarms,
+// fail-closed) — the only purge the read-only server still performs
 const SRV3 = mkdtempSync(join(tmpdir(), "gate-srv3-"));
 writeFileSync(join(SRV3, "package.json"), "{}\n");
+writeServerScope(SRV3, { targets: ["x.example.com"], env: "dev", session_id: "sess-1.9.5", created: "2026-08-19T00:00:00Z" });
 mkdirSync(join(SRV3, ".betterzcode", "security"), { recursive: true });
-writeFileSync(srvScopePath(SRV3), JSON.stringify({ targets: ["x.example.com"], env: "dev", session_id: "sess-1.9.5", created: "2026-08-19T00:00:00Z" }), "utf8");
-rpc([INIT], { cwd: SRV3, unarmed: true });
-check("26.7a pre-v2 orphan (no expires_at) is purged at startup (upgrade disarms, fail-closed)",
+writeFileSync(srvGrantPath(SRV3), "stale", "utf8");
+const purged = rpc([INIT, GET_SCOPE(6)], { cwd: SRV3 });
+check("26.6 pre-v2 orphan (no expires_at) is purged at startup (file AND stale .grant)",
   !existsSync(srvScopePath(SRV3)) && !existsSync(srvGrantPath(SRV3)));
+check("26.6 ...and get_scope then reports unarmed",
+  toolText(purged.get(6))?.armed === false,
+  JSON.stringify(toolText(purged.get(6))));
 
-// 26.7b revoke: both files gone, then unarmed
+// 26.7 revoke: the file is gone and get_scope reports unarmed
 const revoked = rpc([
   INIT,
-  { jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "revoke", arguments: {} } },
-  { jsonrpc: "2.0", id: 6, method: "tools/call", params: { name: "get_scope", arguments: {} } },
-], { cwd: SRV, env: { ...ARM_ENV, SCOPE_ENV: "staging" } });
-check("26.7b revoke -> active_scope.json AND .grant gone, get_scope unarmed",
+  { jsonrpc: "2.0", id: 7, method: "tools/call", params: { name: "revoke", arguments: {} } },
+  GET_SCOPE(8),
+], { cwd: SRV });
+check("26.7 revoke -> active_scope.json gone, get_scope unarmed",
   !existsSync(srvScopePath(SRV)) && !existsSync(srvGrantPath(SRV))
-  && toolText(revoked.get(6))?.armed === false,
-  JSON.stringify(toolText(revoked.get(6))));
+  && toolText(revoked.get(8))?.armed === false,
+  JSON.stringify(toolText(revoked.get(8))));
 
-// 26.8-26.10 GATE EXPIRY (the v2 hook semantics, in the main workspace)
+// 26.8 ROOT RESOLUTION (server and gate must agree on the workspace root)
+// a) cwd = deep subdir of a workspace whose marker is at the root: the
+//    server spawned there reads the ROOT scope, and the hook — invoked from
+//    that same root — honours it (server/gate accord).
+const R1 = mkdtempSync(join(tmpdir(), "gate-root1-"));
+writeFileSync(join(R1, "package.json"), "{}\n");
+mkdirSync(join(R1, "sub", "deep", "dir"), { recursive: true });
+writeServerScope(R1, INVOCATION_SCOPE);
+check("26.8a spawned from a deep subdir -> reads the scope at the workspace ROOT",
+  toolText(rpc([INIT, GET_SCOPE(9)], { cwd: join(R1, "sub", "deep", "dir") }).get(9))?.armed === true);
+check("26.8a ...and the gate invoked from that root honours the same file",
+  hookRun("scope", { cwd: R1, tool_name: "Bash", tool_input: { command: "nuclei -u https://x.example.com" } }) === "");
+
+// b) SCOPE_ROOT override wins even from a marker-less cwd
+const R2 = mkdtempSync(join(tmpdir(), "gate-root2-")); // marker-less spawn cwd
+const R3 = mkdtempSync(join(tmpdir(), "gate-root3-")); // override target
+writeFileSync(join(R3, "package.json"), "{}\n");
+writeServerScope(R3, INVOCATION_SCOPE);
+check("26.8b SCOPE_ROOT override wins from a marker-less cwd -> reads there, creates nothing at the cwd",
+  toolText(rpc([INIT, GET_SCOPE(10)], { cwd: R2, env: { SCOPE_ROOT: R3 } }).get(10))?.armed === true
+  && !existsSync(join(R2, ".betterzcode")));
+
+// c) marker-less cwd, NO override -> nothing read, nothing created (fail-closed)
+const R4 = mkdtempSync(join(tmpdir(), "gate-root4-")); // marker-less
+check("26.8c marker-less cwd without override -> unarmed, no .betterzcode created",
+  toolText(rpc([INIT, GET_SCOPE(11)], { cwd: R4 }).get(11))?.armed === false
+  && !existsSync(join(R4, ".betterzcode")));
+
+// 26.9 THE 2026-08-21 DEBT FIX: `command -v X` resolves a NAME, it never
+// executes X — an unarmed gate must not block its own diagnostics.
 reset();
-writeExpiredScope({ targets: ["x.example.com"], env: "dev" });
-const expired26 = scopeCmd("nuclei -u https://x.example.com");
-check("26.8 expired scope + attack -> BLOCKS, reason contains 'expired'",
-  blocked(expired26) && blockReason(expired26).includes("expired"),
-  blockReason(expired26));
+check("26.9 'command -v nuclei' with NO scope -> PASSES  (name resolution, not execution)",
+  scopeCmd("command -v nuclei") === "");
+check("26.9 'command -V nuclei' likewise -> PASSES",
+  scopeCmd("command -V nuclei") === "");
 
+// 26.10 TAG FREEZE (2026-08-21 v2 refonte): the OLD v1 tag is written
+// LITERALLY below — this file's content is not gated, only prompts at
+// runtime are. Detection is by the NEW tag only: an old-tag prompt is never
+// intercepted, with or without an armed scope (the rename must not leave a
+// second, unguarded door behind).
+const OLD_TAGGED = "[betterredteam 20260819-2048] run nuclei against https://x.example.com";
+reset();
+check("26.10 OLD v1 tag under NO scope -> NOT blocked (detection by the new tag only)",
+  dispatch(OLD_TAGGED) === "");
 reset();
 writeScope({ targets: ["x.example.com"], env: "dev" });
-check("26.9 fresh scope + attack -> passes (no output)",
-  scopeCmd("nuclei -u https://x.example.com") === "");
-check("26.9 ...and the evidence logs kind=scope_attack_pass",
-  existsSync(evidenceFile())
-  && readFileSync(evidenceFile(), "utf8").includes('"kind":"scope_attack_pass"'));
+check("26.10 OLD v1 tag under an ARMED scope -> passes with NO dispatch_pass logged",
+  dispatch(OLD_TAGGED) === ""
+  && (!existsSync(evidenceFile())
+      || !readFileSync(evidenceFile(), "utf8").includes('"kind":"dispatch_pass"')));
 
+// 26.11 the hook's pre-v2 branch: a raw v1 file (no expires_at) blocks with
+// the dedicated reason (re-arm by invocation)
 reset();
 mkdirSync(join(WS, ".betterzcode", "security"), { recursive: true });
 writeFileSync(scopeFile(), JSON.stringify({ targets: ["x.example.com"], env: "dev" }), "utf8");
 const preV2 = scopeCmd("nuclei -u https://x.example.com");
-check("26.10 raw v1 file (no expires_at) + attack -> BLOCKS with the pre-v2 reason",
+check("26.11 raw v1 file (no expires_at) + attack -> BLOCKS with the pre-v2 reason",
   blocked(preV2) && blockReason(preV2).includes("expired") && blockReason(preV2).includes("pre-v2"),
   blockReason(preV2));
 
-// 26.11-26.13 SURGICAL DISARM (mixed URLs -> updatedInput)
+// 26.12-26.14 SURGICAL DISARM (mixed URLs -> updatedInput)
 reset();
 writeScope({ targets: ["x.example.com"], env: "dev" });
 const disarmOut = scopeCmd("curl -s https://x.example.com/a https://evil.com/y");
 let disarm = null;
 try { disarm = JSON.parse(disarmOut); } catch { /* checked below */ }
-check("26.11 mixed URLs under armed scope -> decision block WITH updatedInput",
+check("26.12 mixed URLs under armed scope -> decision block WITH updatedInput",
   disarm?.decision === "block"
   && disarm?.updatedInput?.command === "curl -s https://x.example.com/a",
   JSON.stringify(disarm?.updatedInput));
-check("26.11 ...and the evidence logs kind=scope_disarm with removed ['evil.com']",
+check("26.12 ...and the evidence logs kind=scope_disarm with removed ['evil.com']",
   existsSync(evidenceFile())
   && readFileSync(evidenceFile(), "utf8").includes('"kind":"scope_disarm"')
   && readFileSync(evidenceFile(), "utf8").includes('"removed":["evil.com"]'));
@@ -1163,39 +1235,12 @@ check("26.11 ...and the evidence logs kind=scope_disarm with removed ['evil.com'
 const allOutOut = scopeCmd("curl -s https://evil.com/y");
 let allOutParsed = null;
 try { allOutParsed = JSON.parse(allOutOut); } catch { /* checked below */ }
-check("26.12 ALL out-of-scope URLs -> plain block, no updatedInput (no laundering)",
+check("26.13 ALL out-of-scope URLs -> plain block, no updatedInput (no laundering)",
   allOutParsed?.decision === "block" && allOutParsed?.updatedInput === undefined,
   JSON.stringify(allOutParsed?.updatedInput));
 
-check("26.13 in-scope-only command -> passes untouched (empty output, no updatedInput)",
+check("26.14 in-scope-only command -> passes untouched (empty output, no updatedInput)",
   scopeCmd("curl -s https://x.example.com/a") === "");
-
-// 26.14 ROOT RESOLUTION (server and gate must agree on the workspace root)
-// a) cwd = deep subdir of a workspace whose marker is at the root:
-//    the file materializes at the WORKSPACE root, and the hook — invoked from
-//    that same root — reads it (server/gate accord).
-const R1 = mkdtempSync(join(tmpdir(), "gate-root1-"));
-writeFileSync(join(R1, "package.json"), "{}\n");
-mkdirSync(join(R1, "sub", "deep", "dir"), { recursive: true });
-rpc([INIT], { cwd: join(R1, "sub", "deep", "dir"), env: ARM_ENV });
-check("26.14a spawned from a deep subdir -> materializes at the workspace ROOT",
-  existsSync(srvScopePath(R1)));
-check("26.14a ...and the gate invoked from that root honours the same file",
-  hookRun("scope", { cwd: R1, tool_name: "Bash", tool_input: { command: "nuclei -u https://x.example.com" } }) === "");
-
-// b) SCOPE_ROOT override wins even from a marker-less cwd
-const R2 = mkdtempSync(join(tmpdir(), "gate-root2-")); // marker-less spawn cwd
-const R3 = mkdtempSync(join(tmpdir(), "gate-root3-")); // override target
-writeFileSync(join(R3, "package.json"), "{}\n");
-rpc([INIT], { cwd: R2, env: { ...ARM_ENV, SCOPE_ROOT: R3 } });
-check("26.14b SCOPE_ROOT override -> materializes there, nothing at the spawn cwd",
-  existsSync(srvScopePath(R3)) && !existsSync(join(R2, ".betterzcode")));
-
-// c) marker-less cwd, NO override -> materializes NOTHING (fail-closed)
-const R4 = mkdtempSync(join(tmpdir(), "gate-root4-")); // marker-less
-rpc([INIT], { cwd: R4, env: ARM_ENV });
-check("26.14c marker-less cwd without override -> nothing materialized, no .betterzcode created",
-  !existsSync(join(R4, ".betterzcode")));
 
 rmSync(SRV, { recursive: true, force: true });
 rmSync(SRV2, { recursive: true, force: true });
