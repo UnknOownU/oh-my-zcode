@@ -813,13 +813,14 @@ function onStop(payload) {
  * The scope gate (PreToolUse/Bash), fourth mechanical gate.
  *
  * An attack command is admissible only against a declared scope: the file
- * <root>/.betterzcode/security/active_scope.json, created by /betterredteam,
- * naming the authorised targets, a non-prod env and the owning session.
+ * <root>/.betterzcode/security/active_scope.json, materialized by the plugin's
+ * MCP scope server from the Settings fields (the agent has no write path to
+ * it since v2), naming the authorised targets, a non-prod env and an expiry.
  * Missing or unparsable file fails CLOSED for attack tools and stays silent
  * for everything else — a normal dev session must feel zero interference.
  */
 const SCOPE_POINTER =
-  "Scope gate: authorization is created via /betterredteam.";
+  "Scope gate: authorization is armed in Settings → Plugins → oh-my-zcode (scope fields) — /betterredteam walks you through it.";
 
 function scopeFilePath(payload) {
   return join(projectRoot(payload), ".betterzcode", "security", "active_scope.json");
@@ -832,6 +833,62 @@ function readScopeFile(payload) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Why the loaded scope is expired, or null when it is not (2026-08-21).
+ *
+ * v2 replaced the v1.9.5 session binding with expiry windows: the MCP scope
+ * server stamps `expires_at` at materialization, and the hook only trusts a
+ * window that is still open. An ABSENT expires_at means a pre-v2 scope file
+ * written by the old agent-side flow — treated as expired, fail-closed: the
+ * only legitimate writer now always stamps an expiry. Unparsable timestamps
+ * fail the same way (NaN = not provably still valid = invalid).
+ */
+function scopeExpiredReason(scope) {
+  if (scope.expires_at === undefined || scope.expires_at === null) {
+    return "scope expired (pre-v2 scope file without expires_at — re-arm via Settings)";
+  }
+  const t = Date.parse(scope.expires_at);
+  if (Number.isNaN(t) || t <= Date.now()) return `scope expired at ${scope.expires_at}`;
+  return null;
+}
+
+/**
+ * Is the loaded scope a validly ARMED v2 scope? Expiry replaces the session
+ * binding (same date): targets non-empty, env non-prod, window still open.
+ * Both consumers (onScope, onDispatch) must judge by this one rule so the
+ * Bash gate and the dispatch gate can never disagree.
+ */
+function scopeArmed(scope) {
+  return scope !== null
+    && Array.isArray(scope.targets)
+    && scope.targets.length > 0
+    && typeof scope.env === "string"
+    && scope.env !== "prod"
+    && scopeExpiredReason(scope) === null;
+}
+
+/**
+ * Cause-specific reason for an invalid scope, shared by the Bash and dispatch
+ * gates (identical chain, so a mismatch would be a defect). Order matters:
+ * file-level causes first, then field causes, expiry last.
+ */
+function scopeInvalidReason(payload, scope) {
+  if (scope === null) {
+    return existsSync(scopeFilePath(payload))
+      ? "active_scope.json is present but malformed (unparsable JSON)"
+      : "no active_scope.json — no scope armed";
+  }
+  if (!Array.isArray(scope.targets) || !scope.targets.length) {
+    return "scope file invalid: targets is missing or empty";
+  }
+  if (!(typeof scope.env === "string" && scope.env !== "prod")) {
+    return `scope env invalid (got ${JSON.stringify(scope.env)})`;
+  }
+  const expired = scopeExpiredReason(scope);
+  if (expired) return expired;
+  return "scope file invalid";
 }
 
 /**
@@ -937,50 +994,60 @@ function onScope(payload) {
     return;
   }
 
-  // 2. An attack command requires a valid scope: parsable file, non-prod
-  //    env, session match. Any failure blocks.
-  if (isAttack) {
-    const valid = scope !== null
-      && Array.isArray(scope.targets)
-      && scope.targets.length
-      && typeof scope.env === "string" && scope.env !== "prod"
-      && scope.session_id === payload.session_id;
-    if (!valid) {
-      scopeBlock(payload, command,
-        scope === null
-          ? existsSync(scopeFilePath(payload))
-            ? "active_scope.json is present but malformed (unparsable JSON)"
-            : "no active_scope.json — no scope file for this session"
-          : !Array.isArray(scope.targets) || !scope.targets.length
-            ? "scope file invalid: targets is missing or empty"
-            : !(typeof scope.env === "string" && scope.env !== "prod")
-              ? `scope env invalid (got ${JSON.stringify(scope.env)})`
-              : `scope belongs to another session (scope session_id=${JSON.stringify(scope.session_id)}, this session=${JSON.stringify(payload.session_id)})`);
-      return;
-    }
+  // 2. An attack command requires a valid armed scope: parsable file,
+  //    non-empty targets, non-prod env, unexpired window. Any failure blocks.
+  if (isAttack && !scopeArmed(scope)) {
+    scopeBlock(payload, command, scopeInvalidReason(payload, scope));
+    return;
   }
 
   // 3. A VALID scope active: every URL in EVERY command must land inside the
   //    declared targets — attack tool, curl, wget, anything.
-  if (scope !== null
-    && Array.isArray(scope.targets)
-    && scope.targets.length
-    && typeof scope.env === "string" && scope.env !== "prod"
-    && scope.session_id === payload.session_id) {
+  if (scopeArmed(scope)) {
     const hosts = commandUrls(command);
-    for (const u of hosts) {
-      if (!scope.targets.some((t) => hostMatchesTarget(u, t))) {
-        scopeBlock(payload, command, `host not in scope targets: ${u.host}`);
-        return;
-      }
+    const outOfScope = hosts.filter(
+      (u) => !scope.targets.some((t) => hostMatchesTarget(u, t)));
+    if (!outOfScope.length) {
+      // 2026-08-20: the audit trail must distinguish "the gate SAW an attack
+      // command pass under an armed scope" (scope_attack_pass) from plain
+      // scoped traffic (scope_pass). Resolution of the LMS BOOSTER ghost
+      // scope_pass: the run's real evidence lives in the TARGET project's
+      // .betterzcode/evidence/, and subagent commands are invisible to hooks
+      // by design — this kind is what makes the difference auditable.
+      log(payload, { kind: isAttack ? "scope_attack_pass" : "scope_pass", command: head });
+      return;
     }
-    // 2026-08-20: the audit trail must distinguish "the gate SAW an attack
-    // command pass under an armed scope" (scope_attack_pass) from plain
-    // scoped traffic (scope_pass). Resolution of the LMS BOOSTER ghost
-    // scope_pass: the run's real evidence lives in the TARGET project's
-    // .betterzcode/evidence/, and subagent commands are invisible to hooks
-    // by design — this kind is what makes the difference auditable.
-    log(payload, { kind: isAttack ? "scope_attack_pass" : "scope_pass", command: head });
+
+    // 2026-08-21, surgical disarm: a MIXED command (at least one in-scope URL,
+    // at least one out) is not thrown away wholesale — the offending tokens
+    // are stripped via updatedInput and the in-scope work survives. All
+    // out-of-scope keeps the v1.9.5 behavior (block). If stripping would
+    // leave no in-scope URL at all, block instead: a disarm only preserves
+    // work that remains valid, it never launders a fully out-of-scope call.
+    const inScopeCount = hosts.length - outOfScope.length;
+    if (inScopeCount > 0) {
+      const badHosts = outOfScope.map((u) => u.host);
+      const badSet = new Set(badHosts);
+      const kept = command.split(/\s+/)
+        .filter((tok) => tok !== ""
+          && !commandUrls(tok).some((u) => badSet.has(u.host)));
+      const rewritten = kept.join(" ");
+      log(payload, {
+        kind: "scope_disarm",
+        removed: badHosts,
+        command: head,
+      });
+      emit({
+        decision: "block",
+        reason:
+          "Scope gate: out-of-scope URL(s) removed from the command " +
+          `(${badHosts.join(", ")}); the rewritten command below is the ` +
+          `authorized remainder.\n${SCOPE_POINTER}`,
+        updatedInput: { command: rewritten },
+      });
+      return;
+    }
+    scopeBlock(payload, command, `host not in scope targets: ${outOfScope[0].host}`);
     return;
   }
 
@@ -1027,25 +1094,12 @@ function onDispatch(payload) {
     return;
   }
 
-  // 2. A tagged dispatch requires a valid scope: parsable file, non-prod env,
-  //    session match. Any failure blocks, cause-specific (onScope in spirit).
+  // 2. A tagged dispatch requires a valid armed scope, judged by the SAME
+  //    rule as the Bash gate (2026-08-21: expiry window, no session binding):
+  //    any failure blocks, cause-specific via the shared reason chain.
   const scope = readScopeFile(payload);
-  const valid = scope !== null
-    && Array.isArray(scope.targets)
-    && scope.targets.length
-    && typeof scope.env === "string" && scope.env !== "prod"
-    && scope.session_id === payload.session_id;
-  if (!valid) {
-    dispatchBlock(payload, scope === null
-      ? existsSync(scopeFilePath(payload))
-        ? "active_scope.json is present but malformed (unparsable JSON)"
-        : "no active_scope.json — no scope file for this session"
-      : !Array.isArray(scope.targets) || !scope.targets.length
-        ? "scope file invalid: targets is missing or empty"
-        : !(typeof scope.env === "string" && scope.env !== "prod")
-          ? `scope env invalid (got ${JSON.stringify(scope.env)})`
-          : `scope belongs to another session (scope session_id=${JSON.stringify(scope.session_id)}, this session=${JSON.stringify(payload.session_id)})`,
-      head);
+  if (!scopeArmed(scope)) {
+    dispatchBlock(payload, scopeInvalidReason(payload, scope), head);
     return;
   }
 
