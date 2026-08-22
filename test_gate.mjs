@@ -1002,6 +1002,31 @@ reset();
 check("25.21 'sudo -u root grep nuclei README.md' -> PASSES  (grep is the head, nuclei an argument)",
   scopeCmd("sudo -u root grep nuclei README.md") === "");
 
+// 25.22 claim/proof typing contract (v2.1.0, 2026-08-21 incident): a source
+// claim can never be signed by a behavioral proof
+const RT = readFileSync(join(HERE, "oh-my-zcode", "commands", "ohmy-redteam.md"), "utf8");
+const SEC = readFileSync(join(HERE, "oh-my-zcode", "commands", "ohmy-security.md"), "utf8");
+const FV = readFileSync(join(HERE, "oh-my-zcode", "agents", "ohmy-finding-verifier.md"), "utf8");
+const SG = readFileSync(join(HERE, "oh-my-zcode", "skills", "security-gate", "SKILL.md"), "utf8");
+check("25.22 ohmy-redteam return format carries claim types behavior|source",
+  RT.includes("claim type per entry: `behavior`") && RT.includes("`source`"), "return-format bullet missing");
+check("25.22 ohmy-redteam recon writes a ## PROVENANCE block with the source commit",
+  RT.includes("## PROVENANCE") && RT.includes("source commit:"), "PROVENANCE spec missing");
+check("25.22 beast dispatch-receives list stays rule-free (no claim typing leaks into lines 87-93)",
+  !RT.split("Each beast receives ONLY:")[1].split("Every beast dispatch prompt")[0].includes("claim"), "claim typing leaked into the dispatch list");
+check("25.22 finding-verifier input carries the claim type field",
+  FV.includes("claim type (`behavior` or `source`)"), "input field list missing claim type");
+check("25.22 finding-verifier vocabulary has PROOF-TYPE MISMATCH in both the rules list and the output template",
+  FV.includes("`PROOF-TYPE MISMATCH`") && FV.includes("Verdict: CONFIRMED | NOT REPRODUCED | OUT OF SCOPE | PROOF-TYPE MISMATCH"), "vocabulary/template not extended");
+check("25.22 finding-verifier final line unchanged (reserved signatures untouched)",
+  FV.includes("FINDINGS: <C> CONFIRMED, <R> REJECTED") && !FV.includes("FINDINGS: VERIFIED\n```"), "final-line contract broken");
+check("25.22 ohmy-security shared field list + verdict echo move with the contract",
+  SEC.includes("claim type (`behavior` or `source`)") && SEC.includes("PROOF-TYPE MISMATCH"), "sibling contract stale");
+check("25.22 security-gate rule 19: a code comment is not evidence of current state",
+  SG.includes("19. **A code comment is not evidence of current state."), "rule 19 missing");
+check("25.23 ohmy-redteam beast prompts are clock-free (no minutes/budgets/deadlines in dispatch text)",
+  RT.includes("NO clocks: never mention minutes, budgets or deadlines"), "the NO-clocks freeze line is missing");
+
 // ---------------------------------------------------------------------------
 // 26. v2.0.0 MCP SCOPE SERVER — REWRITTEN 2026-08-21 (v2 refonte)
 // MODEL CHANGE, not a fix: env-arming (SCOPE_* config, .grant materialization)

@@ -59,6 +59,8 @@ when_to_use: when any security test or red-team run is being planned, executed, 
 
 18. **The report grades the defenses too, and cleanup is re-verified by execution**: per-family detection coverage (x launched / y blocked / z logged) and a cleanup check that re-executes (declared artifacts absent). *Evidence: PTES requires countermeasure metrics ("we ran x attacks and IPS blocked y"); NIST grades detection by log review; NIST requires verified sanitization — a MECHANICAL cleanup check exceeds standard practice, stated as such.*
 
+19. **A code comment is not evidence of current state.** A `source` claim is proven by reading code at the recorded PROVENANCE HEAD — never by a comment, never by a curl. A `behavior` proof (an executed request) decides what the deployed artifact does; it can never decide what the source contains. *Evidence: 2026-08-21 incident, this pipeline's own run history — two beasts measured a 404 on a route (behavior, real), the run generalized to "the code does not mount the route" (a source claim signed by a behavioral proof plus a stale comment in `routes/mod.rs`, "Production composition deliberately stays in task 14"); an external reviewer reading git + code at HEAD found the route mounted — the behavior finding survived, the causal sentence did not.*
+
 ## Practice targets
 
 XBOW set via the MAPTA repo (104 web challenges), AutoPenBench (33 tasks, milestone credit), CyBench, NYU CTF. InterCode-CTF is saturated (95%) — do not practice on it.

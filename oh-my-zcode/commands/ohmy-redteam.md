@@ -77,7 +77,17 @@ Build the attack plan by WSTG family. Delegate to `ohmy-plan-critic` (three roun
 
 ## Step 3: RECON
 
-One agent builds `.oh-my-zcode/security/<run>/surface.md`: endpoints, parameters, authentication, tech stack.
+One agent builds `.oh-my-zcode/security/<run>/surface.md`: endpoints, parameters, authentication, tech stack. The file STARTS with a `## PROVENANCE` block, 3-5 lines, raw outputs of commands the recon agent executed, nothing inferred:
+
+```
+## PROVENANCE
+- artifact tested: <image:digest or build id, build date> — or "target as-deployed, no artifact id discoverable"
+- source commit: <git rev-parse HEAD output, if discoverable> — or "not discoverable"
+- working tree: <git branch --show-current>, <git rev-parse --short HEAD>, clean|dirty (<git status --porcelain> line count)
+- PROVENANCE date: <ISO now>
+```
+
+Every PROVENANCE field is consumed downstream: the source commit is the commit at which `source` claims are read and verified; the artifact/build line is what `behavior` claims executed against. A `source` claim that cannot name the PROVENANCE commit is unverifiable — the beast does not make it.
 
 The surface map decides the team: it fits one page -> a **single attacker**; otherwise up to **3 by family** (injection / auth+session / authorization+business logic).
 
@@ -94,10 +104,11 @@ Dispatch attacker subagents (inline, `glm-5.3`, generous maxTurns). Each beast r
 
 Every beast dispatch prompt STARTS with the line `[ohmy-redteam <run-id>]` — an inert routing label the scope gate reads to route the dispatch itself. It is NOT a rule: the beast stays blind, the cage enforces.
 
-NO rule lists. NO ethics paragraphs. NO prohibited-actions text in the beast prompt — the cage (the scope gate) enforces. And the cage now covers the dispatch itself, not just Bash commands: a tagged dispatch without an armed scope is blocked mechanically.
+NO rule lists. NO ethics paragraphs. NO prohibited-actions text in the beast prompt — the cage (the scope gate) enforces. NO clocks: never mention minutes, budgets or deadlines in a beast prompt — the beast has no chronometer, so a time budget is not a constraint it can honor, only pressure that cuts the chain before the data; the ceiling is the maxTurns the orchestrator sets, invisible to the beast, and depth over breadth is decided by what the responses show, not by a timer. And the cage now covers the dispatch itself, not just Bash commands: a tagged dispatch without an armed scope is blocked mechanically.
 
 Each beast chains within its family (foothold -> escalation -> data) and returns ONLY structured entries:
 
+- claim type per entry: `behavior` (proven by executing the attached command/request against the target) or `source` (a claim about the code itself — proven only by git state + reading code at the PROVENANCE commit, never by a request's outcome)
 - raw proofs: exact commands/requests + outputs
 - loot updates (credentials found, endpoints, roles) appended to `.oh-my-zcode/security/<run>/loot.md`
 

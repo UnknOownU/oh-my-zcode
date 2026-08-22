@@ -47,11 +47,11 @@ The surface map decides the team: it fits one page -> a **single attacker**; oth
 
 Subagents. Each receives the four parts + `surface.md` + its family ONLY — never another attacker's output.
 
-Interactive command/observe loop, real tools, rate-limited. Each returns **candidate findings only**, as structured entries: title, severity, location, the exact command or HTTP request, the expected evidence. No narrative.
+Interactive command/observe loop, real tools, rate-limited. Each returns **candidate findings only**, as structured entries: title, severity, location, claim type (`behavior` or `source`), the exact command or HTTP request, the expected evidence. No narrative.
 
 ## Step 5: FINDING-VERIFIER
 
-Delegate the candidates to `ohmy-finding-verifier` WITHOUT the attacker's reasoning. You get per finding CONFIRMED / NOT REPRODUCED / OUT OF SCOPE, each with the raw output of the re-execution.
+Delegate the candidates to `ohmy-finding-verifier` WITHOUT the attacker's reasoning. You get per finding CONFIRMED / NOT REPRODUCED / OUT OF SCOPE / PROOF-TYPE MISMATCH, each with the raw output of the re-execution.
 
 ## Step 6: RUN THE DECIDING COMMANDS YOURSELF
 
