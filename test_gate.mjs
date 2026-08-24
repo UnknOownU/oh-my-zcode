@@ -1026,6 +1026,24 @@ check("25.22 security-gate rule 19: a code comment is not evidence of current st
   SG.includes("19. **A code comment is not evidence of current state."), "rule 19 missing");
 check("25.23 ohmy-redteam beast prompts are clock-free (no minutes/budgets/deadlines in dispatch text)",
   RT.includes("NO clocks: never mention minutes, budgets or deadlines"), "the NO-clocks freeze line is missing");
+check("25.24 ohmy-redteam Step 2 defines PRIZES and no family text remains",
+  RT.includes("PRIZES") && RT.includes("read all user data") && RT.includes("admin access") && RT.includes("code execution") && !RT.includes("family"), "prize definition missing or family text remains");
+check("25.24 ohmy-redteam dispatch carries the YOUR PRIZE contract",
+  RT.includes("YOUR PRIZE") && RT.includes("surface.md` and `source-map.md"), "prize framing or two-map receives bullet missing");
+check("25.25 ohmy-redteam Step 2.5 writes a source map with PROVENANCE and black-box degradation",
+  RT.includes("source-map.md") && RT.includes("no source available") && RT.includes("guard diffs") && RT.includes("pre-chewed hypothesis"), "source-map contract missing");
+check("25.26 ohmy-redteam wave 2 is a mandatory cascade",
+  RT.includes("Mandatory cascade") && RT.includes("these tools, combined, lead where?"), "cascade paragraph missing");
+check("25.27 ohmy-redteam stopping rule is signal-based",
+  RT.includes("two consecutive waves add no new capability to the loot"), "stopping rule missing");
+check("25.27 ohmy-redteam expiry pause block present",
+  RT.includes("window closed") && RT.includes("resumes the campaign from the existing loot"), "expiry pause block missing");
+check("25.28 security-gate rule 20: the beast hunts a prize, never a checklist",
+  SG.includes("20. **The beast hunts a prize, never a checklist.") && SG.includes("discovery cascade") && SG.includes("CyberGym 84.5%"), "rule 20 or its evidence line missing");
+check("25.29 security-gate rule 21: a failed attempt proves the attempt failed — nothing else",
+  SG.includes("21. **A failed attempt proves the attempt failed") && SG.includes("never deduced from the failure"), "rule 21 or its evidence line missing");
+check("25.29 ohmy-redteam report opens on root causes and names execution planes",
+  RT.includes("ROOT-CAUSE TABLE first") && RT.includes("a generic label like RCE is not a report line"), "report-format clauses missing");
 
 // ---------------------------------------------------------------------------
 // 26. v2.0.0 MCP SCOPE SERVER — REWRITTEN 2026-08-21 (v2 refonte)
