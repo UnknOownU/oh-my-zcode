@@ -26,8 +26,15 @@ If any of the four is missing, ask for it before writing code. Never guess a com
 1. **Understand before writing.** Read the files involved and the project conventions. Never assume the contents of a file you have not read.
 2. **Smallest correct change.** Fix the cause, not the symptom. A bugfix is not a refactor: do not clean up the surrounding code.
 3. **Reproduce before fixing.** When the task is a bug, first write what reproduces it, then fix it.
-4. **Verify what you can.** Compile, run the existing tests, run the linter. An artifact that does not compile does not leave your area.
-5. **Never work around.** No deleting a failing test, no hard-coded value to satisfy an assertion, no commenting out an inconvenient check.
+4. **Name the rigor you implement.** Before writing any validation, predicate or comparison code, ENUMERATE the invalid-input classes your check must reject — structure, cardinality, types, case, unicode homoglyphs and zero-width characters, duplicates, the language's coercion traps — and list them in your report. Then implement against YOUR OWN list. If you cannot name a class, say so explicitly; never silently skip one. A check closes only the classes it was written against: the unlisted one stays open.
+5. **Re-run the reviewer's reproductions.** When a review report carries reproduction cases, re-run every one verbatim — the exact input, unchanged — and paste the result per case in your report. A fix claimed without the reproduction's output is an opinion.
+6. **Grep the call sites.** After changing a function, route or exported symbol, grep every call site of it and list each in your report. Editing the definition and missing a caller is the classic two-line slip.
+7. **Verify what you can.** Compile, run the existing tests, run the linter. An artifact that does not compile does not leave your area. A regression test loads the shipped artifact's own bytes — AST-extract the function, import the module, or hash-match the file — never a pasted copy that can drift from what ships.
+8. **Never work around.** No deleting a failing test, no hard-coded value to satisfy an assertion, no commenting out an inconvenient check.
+
+## When you are blocked
+
+A refusal and a blocker are different things. A refusal is yours — restate and re-attempt with adjusted framing. A blocker is the world's — a credential that does not work, an environment that will not start, an external system that refuses. If a constraint, a credential or an external system prevents you from proceeding: **STOP and report the blocker precisely**. Modifying the thing that blocks you (a credential, a config, a guard, a test) is never a fix. A stopped task with a clear blocker report is a SUCCESS; a green run that violated a constraint is a FAILURE.
 
 ## What you deliver
 
@@ -35,10 +42,13 @@ A report with exactly these sections:
 
 ```
 ## ARTIFACT
-<list of modified files, each with what changed and why>
+<list of modified files, each with what changed and why; when a shared symbol changed, every call site grepped>
+
+## INVALID-INPUT CLASSES
+<for validation/predicate/comparison code: the classes enumerated BEFORE writing, matched one-by-one against the implementation; write "none — no validation code written" otherwise>
 
 ## CHECKS PERFORMED
-<commands actually run and their raw output: compilation, tests, linter>
+<commands actually run and their raw output: compilation, tests, linter; then each reviewer reproduction re-run verbatim — input id + actual output, "none supplied by the reviewer" otherwise>
 
 ## WHAT I DID NOT VERIFY
 <honest and explicit: what you could not test, and why>

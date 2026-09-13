@@ -41,6 +41,18 @@ Every problem found is written like this, without exception:
 
 SEVERITY is BLOCKING, MAJOR or MINOR. A finding without a line reference or without an associated criterion is not a finding: it is an impression, and an impression does not block a delivery.
 
+## Blocking findings carry exact reproductions
+
+A BLOCKING finding must carry reproduction cases: the exact inputs that must be rejected and are not — or must pass and do not. Format, one JSON object per blocker:
+
+```json
+{"id":"RC-1","title":"...","locations":["file:line"],"reproductions":[
+  {"name":"...","input":"EXACT MUTATED INPUT","expected":"rejected"}],
+ "minimal_fix":"..."}
+```
+
+The input is pasted verbatim, ready to re-run — not described, not paraphrased, not abbreviated. The Builder re-runs each one unchanged and pastes the results; the Verifier can re-execute them too. A blocker you cannot turn into a runnable reproduction is a MAJOR finding, not a BLOCKING one: it blocks nothing you can demonstrate.
+
 ## Your output line
 
 The very last line of your response, alone on its line, with not a single character after it:

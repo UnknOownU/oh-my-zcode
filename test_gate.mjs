@@ -1044,6 +1044,19 @@ check("25.29 security-gate rule 21: a failed attempt proves the attempt failed �
   SG.includes("21. **A failed attempt proves the attempt failed") && SG.includes("never deduced from the failure"), "rule 21 or its evidence line missing");
 check("25.29 ohmy-redteam report opens on root causes and names execution planes",
   RT.includes("ROOT-CAUSE TABLE first") && RT.includes("a generic label like RCE is not a report line"), "report-format clauses missing");
+const BLD = readFileSync(join(HERE, "oh-my-zcode", "agents", "ohmy-builder.md"), "utf8");
+const RVW = readFileSync(join(HERE, "oh-my-zcode", "agents", "ohmy-reviewer.md"), "utf8");
+const PLN = readFileSync(join(HERE, "oh-my-zcode", "commands", "ohmy-plan.md"), "utf8");
+check("25.30 ohmy-builder names its rigor — invalid-input classes enumerated before validation code",
+  BLD.includes("ENUMERATE the invalid-input classes") && BLD.includes("never silently skip one"), "builder enumeration rule missing");
+check("25.30 ohmy-builder blocked->STOP (a stopped task with a clear blocker report is a SUCCESS)",
+  BLD.includes("A stopped task with a clear blocker report is a SUCCESS"), "blocked-stop rule missing");
+check("25.30 ohmy-builder re-runs reviewer reproductions verbatim and greps call sites",
+  BLD.includes("re-run every one verbatim") && BLD.includes("grep every call site"), "reproduction/call-site rules missing");
+check("25.30 ohmy-reviewer blockers carry exact runnable reproductions",
+  RVW.includes("EXACT MUTATED INPUT") && RVW.includes("A blocker you cannot turn into a runnable reproduction is a MAJOR finding"), "reviewer reproduction format missing");
+check("25.30 ohmy-plan done-when anchors artifact identity (recorded SHA-256)",
+  PLN.includes("a recorded SHA-256"), "artifact-identity criterion missing");
 
 // ---------------------------------------------------------------------------
 // 26. v2.0.0 MCP SCOPE SERVER — REWRITTEN 2026-08-21 (v2 refonte)

@@ -88,6 +88,7 @@ At the **project root**, in `.oh-my-zcode/plans/<YYYYMMDD-HHMM>_<slug>_<session8
 ## Verification checklist
 - [x] `npm run build` - exit 0
       <the raw output, or its decisive lines>
+- [x] artifact identity - <SHA-256 of each shipped artifact, matching the bytes the run approved — when the deliverable is a re-run or re-deployed artifact>
 - [ ] `<command>` - not run, because <reason>
 
 ## Per area

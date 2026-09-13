@@ -26,6 +26,8 @@ Restate the request in four parts. If one is missing, ask for it now, before any
 
 If the user's "Done when" is not decidable by a command, say so and propose one that is. "It works better" is not a criterion; "`npm test -- orders.spec.ts` passes and returns page 3" is.
 
+When the deliverable is an artifact that will be re-run, re-deployed or shipped, the Done-when must also anchor its IDENTITY, not only its behaviour: the final bytes must match what was approved — a recorded SHA-256, an exact path, a manifest entry. "It behaves right" is not identity: an artifact can behave right and no longer be the thing that was approved.
+
 Create the plan folder now — `.oh-my-zcode/plans/<YYYYMMDD-HHMM>_<slug>_<session8>/` at the **project root** (the folder holding `.git` or `package.json`), where `<slug>` is three or four words from the Goal and `<session8>` is the first 8 characters of the session id.
 
 ## Step 2: Dispatch `ohmy-explorer` (recon)
