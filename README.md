@@ -6,8 +6,8 @@
 
 The home of **BetterZcode** — an evidence-gated pipeline plugin for ZCode:
 
-- **11 sealed agents** that explore, write, review and verify — no agent ever judges its own work, and the orchestrator never holds the pen
-- **5 commands** — `/ohmy-plan`, `/ohmy-swarm`, `/ohmy-research`, `/ohmy-security`, `/ohmy-redteam`
+- **16 sealed agents** that explore, write, review, verify and sit on a blind council — no agent ever judges its own work, and the orchestrator never holds the pen
+- **6 commands** — `/ohmy-council`, `/ohmy-plan`, `/ohmy-swarm`, `/ohmy-research`, `/ohmy-security`, `/ohmy-redteam`
 - **4 mechanical gates** — hooks that block a success verdict no executed test supports, a report citing a page never fetched, a security finding never reproduced, and attack commands fired without an authorized test/dev scope
 
 **This repository is a ZCode marketplace.** The plugin source lives in [`oh-my-zcode/`](oh-my-zcode/README.md) — that's where the full README, the commands, the agents and the doctrine skills are.
