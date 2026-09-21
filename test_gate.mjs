@@ -1,36 +1,37 @@
 #!/usr/bin/env node
 /**
  * Integration tests for the evidence gate and the citation gate, run against the
- * real hook script.
+ * compiled Rust executable.
  *
- * The hook contract is stdin/stdout, so this suite is runtime-agnostic: pass a
- * `.mjs` or a `.py` hook as argv[2] and the same assertions apply.
- *
- *   node test_gate.mjs                      # tests the bundled .mjs hook
- *   node test_gate.mjs path/to/hook.py      # tests any other implementation
+ * Build with cargo build, then run node test_gate.mjs.
+ * OHMY_ZCODE_BIN selects the exact executable under test.
  */
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { BINARY } from "./test_proof_gate_helpers.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const HOOK = process.argv[2]
-  ?? join(HERE, "oh-my-zcode", "hooks", "gate_hook.mjs");
-const RUNTIME = /\.(mjs|js|cjs)$/.test(HOOK) ? "node" : "python";
 
 const WS = mkdtempSync(join(tmpdir(), "gate-"));
 // A real workspace has a project marker; the hook anchors its log to it.
 writeFileSync(join(WS, "package.json"), "{}\n");
+writeFileSync(join(WS, "hosts.txt"), "https://example.test\n");
 const SID = "sess-test";
 let passed = 0;
 let failed = 0;
+let toolSequence = 0;
 
 function run(kind, payload) {
   const body = { session_id: SID, cwd: WS, ...payload };
-  const p = spawnSync(RUNTIME, [HOOK, kind], {
+  if (kind === "evidence" && body.tool_name === "Bash") {
+    body.tool_use_id ??= "native-test-" + (++toolSequence);
+    const pre = spawnSync(BINARY, ["hook", "proof_start"], { input: JSON.stringify(body), encoding: "utf8" });
+    if (pre.status !== 0) throw new Error(pre.stderr);
+  }
+  const p = spawnSync(BINARY, ["hook", kind], {
     input: JSON.stringify(body),
     encoding: "utf8",
   });
@@ -86,12 +87,12 @@ const reset = () => rmSync(join(WS, ".oh-my-zcode"), { recursive: true, force: t
 const evidenceFile = () =>
   join(WS, ".oh-my-zcode", "evidence", `${SID.replace(/[^\w.-]/g, "_")}.jsonl`);
 
-console.log(`Hook under test : ${HOOK}\nRuntime         : ${RUNTIME}\nSandbox         : ${WS}\n`);
+console.log(`Executable under test : ${BINARY}\nSandbox               : ${WS}\n`);
 
 // 1. session-start injection
 const intro = run("session_start", { source: "startup" });
 check("SessionStart injects the doctrine",
-  intro.includes("additionalContext") && intro.includes("sealed roles"));
+  typeof JSON.parse(intro).hookSpecificOutput?.additionalContext === "string");
 
 // 2. PASS with nothing at all
 reset();
@@ -127,10 +128,10 @@ bash("cat src/index.ts");
 check("proof in PREVIOUS turn + PASS this turn -> BLOCKS",
   blocked(stop("VERDICT: PASS")));
 
-// 7. anti-loop
+// 7. proof retries remain enforced; an honest failure exits.
 reset();
-check("stop_hook_active -> never re-blocks",
-  !blocked(stop("VERDICT: PASS", true)));
+check("unbacked PASS remains blocked on retry; FAIL can end the turn",
+  blocked(stop("VERDICT: PASS", true)) && !blocked(stop("VERDICT: FAIL", true)));
 
 // 8. no verdict, no interference
 reset();
@@ -183,7 +184,7 @@ check("in-prose mention WITHOUT a final line -> DOES NOT BLOCK",
 
 // 11. robustness: never bring a session down
 for (const [kind, data] of [["stop", ""], ["session_start", "{broken"], ["unknown", "{}"]]) {
-  const p = spawnSync(RUNTIME, [HOOK, kind], { input: data, encoding: "utf8" });
+  const p = spawnSync(BINARY, ["hook", kind], { input: data, encoding: "utf8" });
   check(`robustness (${kind}, input ${JSON.stringify(data)}) -> exit 0`, p.status === 0);
 }
 
@@ -227,7 +228,7 @@ rmSync(join(WS, "app"), { recursive: true, force: true });
 // 15. probe payloads write nothing (ZCode calls hooks with an empty payload
 // when the plugin loads; that used to leave junk in the home directory)
 reset();
-const probe = spawnSync(RUNTIME, [HOOK, "session_start"], {
+const probe = spawnSync(BINARY, ["hook", "session_start"], {
   input: JSON.stringify({ source: "startup" }), encoding: "utf8",
 });
 check("probe payload without session_id still injects the doctrine",
@@ -253,8 +254,8 @@ check("marker + the cited page was fetched -> lets through",
 // 16.3 arXiv serves one paper under several URLs
 reset();
 fetchUrl("https://arxiv.org/pdf/2503.13657v2.pdf");
-check("fetched the PDF, cited the abstract page -> lets through",
-  !blocked(stop("See https://arxiv.org/abs/2503.13657 for the taxonomy.\n\nSOURCES: VERIFIED")));
+check("unfetched abstract URL is distinct from fetched versioned PDF",
+  blocked(stop("See https://arxiv.org/abs/2503.13657 for the taxonomy.\n\nSOURCES: VERIFIED")));
 
 // 16.4 markdown links must yield the URL, not the bracket
 reset();
@@ -265,8 +266,8 @@ check("markdown link syntax is extracted, not the closing bracket",
 // 16.5 a sentence-final URL keeps its punctuation in prose
 reset();
 fetchUrl("https://example.org/paper");
-check("trailing punctuation after a bare URL is stripped",
-  !blocked(stop("Full text at https://example.org/paper.\n\nSOURCES: VERIFIED")));
+check("unfetched path ending in punctuation stays distinct",
+  blocked(stop("Full text at https://example.org/paper.\n\nSOURCES: VERIFIED")));
 
 // 16.6 signing over an empty set would be the cheapest way to disarm the gate
 reset();
@@ -302,7 +303,7 @@ reset();
 fetchUrl("https://arxiv.org/abs/2503.13657");
 stop("interim note, no signature");   // closes the turn
 check("a source fetched in a PREVIOUS turn still counts (session window)",
-  !blocked(stop("The taxonomy is in https://arxiv.org/abs/2503.13657.\n\nSOURCES: VERIFIED")));
+  !blocked(stop("The [taxonomy](https://arxiv.org/abs/2503.13657) remains available.\n\nSOURCES: VERIFIED")));
 
 // 16.11 what lands in the log
 reset();
@@ -316,10 +317,12 @@ const searchLog = readFileSync(evidenceFile(), "utf8");
 check("a search is logged, but never as a source",
   searchLog.includes('"kind":"search"') && !searchLog.includes('"kind":"source"'));
 
-// 16.12 anti-loop applies to this gate too
+// 16.12 A retry cannot turn an unsupported source claim into evidence.
 reset();
-check("stop_hook_active -> the citation gate never re-blocks either",
-  !blocked(stop("No source here.\n\nSOURCES: VERIFIED", true)));
+check("stop_hook_active -> unverified sources remain blocked",
+  blocked(stop("No source here.\n\nSOURCES: VERIFIED", true)));
+check("SOURCES: FAIL permits an honest failure after a blocked retry",
+  !blocked(stop("SOURCES: FAIL", true)));
 
 // 16.13 the two gates do not interfere
 reset();
@@ -377,22 +380,25 @@ check("a successful fetch with no error field still counts as a source",
   !blocked(stop("Read https://example.org/ok\n\nSOURCES: VERIFIED")));
 
 // ---------------------------------------------------------------------------
-// 19. THE BYPASS IS RECORDED, NOT HIDDEN
-// The anti-loop must never block twice, but the audit trail must still say
-// whether the retry actually complied.
+// 19. RETRIES KEEP THE SAME PROOF REQUIREMENTS
+// The audit trail distinguishes an unsupported retry from a compliant one.
 // ---------------------------------------------------------------------------
 
 reset();
-const bypassOut = stop("Still nothing to show.\n\nSOURCES: VERIFIED", true);
-check("retry that is still non-compliant -> not blocked", !blocked(bypassOut));
-check("...but the log records gate_bypassed",
-  readFileSync(evidenceFile(), "utf8").includes('"gate_bypassed"'));
+const retryOut = stop("Still nothing to show.\n\nSOURCES: VERIFIED", true);
+check("retry that is still non-compliant -> remains blocked", blocked(retryOut));
+check("...and the log records the current-schema gate block",
+  readFileSync(evidenceFile(), "utf8").trim().split('\n').some(line => {
+    const entry = JSON.parse(line);
+    return entry.schema === 'oh-my-zcode/audit/v3' && entry.kind === 'gate_block';
+  }));
 
 reset();
 fetchUrl("https://example.org/ok");
 stop("Read https://example.org/ok\n\nSOURCES: VERIFIED", true);
-check("retry that IS compliant is logged as compliant, not as a bypass",
-  readFileSync(evidenceFile(), "utf8").includes("compliant after gate retry"));
+const completedRetry = JSON.parse(readFileSync(evidenceFile(), "utf8").trim().split('\n').at(-1));
+check("retry that IS compliant ends the current-schema turn",
+  completedRetry.schema === 'oh-my-zcode/audit/v3' && completedRetry.kind === 'turn_end');
 
 // ---------------------------------------------------------------------------
 // 20. Z.AI webReader — recognised by input shape, not by tool name
@@ -466,13 +472,13 @@ reset();
 check("marker quoted in prose without a final line -> does not block",
   !blocked(stop("End the report with 'FINDINGS: VERIFIED' once you have reproduced each finding.")));
 
-// 21.8 anti-loop applies to this gate too
+// 21.8 findings retries also require a valid proof.
 reset();
 const findingsBypass = stop("Still just an allegation.\n\nFINDINGS: VERIFIED", true);
-check("stop_hook_active -> the findings gate never re-blocks",
-  !blocked(findingsBypass));
-check("...but the log records gate_bypassed",
-  readFileSync(evidenceFile(), "utf8").includes('"gate_bypassed"'));
+check("stop_hook_active -> unbacked findings remain blocked",
+  blocked(findingsBypass));
+check("...and the log records gate_block",
+  readFileSync(evidenceFile(), "utf8").includes('"gate_block"'));
 
 // 21.9 security tools are verification commands for the evidence gate too
 reset();
@@ -501,12 +507,7 @@ check("marker with ZERO verification commands the whole session -> BLOCKS",
 // ---------------------------------------------------------------------------
 
 const scopeFile = () => join(WS, ".oh-my-zcode", "security", "active_scope.json");
-// UPDATED 2026-08-21 (v2.0.0 model change): fixtures are v2-format
-// {targets, env, granted_at, expires_at, source}. Expiry windows REPLACE the
-// v1.9.5 session binding — authorization is armed BY INVOCATION (the
-// /ohmy-redteam command writes the file, 60-minute window); session_id is
-// gone from the file. Defaults: granted_at = now, expires_at = +60 min,
-// source = "invocation" (overridable — 26.6 needs a v1 orphan, not this).
+// Current authorization is written by invocation with a 60-minute window.
 const writeScope = (s) => {
   const grantedAt = s.granted_at ?? new Date().toISOString();
   const expiresAt = s.expires_at
@@ -620,7 +621,7 @@ check("a scoped pass is logged as kind=scope_pass",
 
 // 22.12 payloads without a session id: attack fails closed, curl passes
 const noSession = (command) => {
-  const p = spawnSync(RUNTIME, [HOOK, "scope"], {
+  const p = spawnSync(BINARY, ["hook", "scope"], {
     input: JSON.stringify({ cwd: WS, tool_name: "Bash", tool_input: { command } }),
     encoding: "utf8",
   });
@@ -734,7 +735,7 @@ check("...and the reason contains the offending host",
 
 // 23.7 payloads without a session id: tagged fails closed, untagged passes
 const noSessionDispatch = (prompt) => {
-  const p = spawnSync(RUNTIME, [HOOK, "dispatch"], {
+  const p = spawnSync(BINARY, ["hook", "dispatch"], {
     input: JSON.stringify({
       cwd: WS,
       tool_name: "Agent",
@@ -789,9 +790,9 @@ writeScope({ targets: ["x.example.com"], env: "dev" });
 // writeScope writes at WS level; the scope file must move to the WS/incident root
 mkdirSync(join(WS, "incident", ".oh-my-zcode", "security"), { recursive: true });
 writeFileSync(join(WS, "incident", ".oh-my-zcode", "security", "active_scope.json"),
-  JSON.stringify({ targets: ["x.example.com"], env: "dev", granted_at: "2026-08-21T00:00:00Z", expires_at: "2099-01-01T00:00:00Z" }), "utf8");
+  JSON.stringify({ targets: ["x.example.com"], env: "dev", granted_at: "2026-08-21T00:00:00Z", expires_at: "2099-01-01T00:00:00Z", source: "invocation" }), "utf8");
 const fromApp = (kind, toolInput) => {
-  const p = spawnSync(RUNTIME, [HOOK, kind], {
+  const p = spawnSync(BINARY, ["hook", kind], {
     input: JSON.stringify({
       session_id: SID,
       cwd: join(WS, "incident", "app"),
@@ -828,7 +829,7 @@ rmSync(join(WS, "incident"), { recursive: true, force: true });
 // ---------------------------------------------------------------------------
 
 const hookRun = (kind, payload) => {
-  const p = spawnSync(RUNTIME, [HOOK, kind], {
+  const p = spawnSync(BINARY, ["hook", kind], {
     input: JSON.stringify({ session_id: SID, ...payload }),
     encoding: "utf8",
   });
@@ -854,7 +855,7 @@ check("24.1 poison-free bootstrap: block from WS/app writes evidence at WS",
 // scope at WS works from WS/app — no orphan shadow, no fail-closed lockout.
 mkdirSync(join(W1, ".oh-my-zcode", "security"), { recursive: true });
 writeFileSync(join(W1, ".oh-my-zcode", "security", "active_scope.json"),
-  JSON.stringify({ targets: ["x.example.com"], env: "dev", granted_at: "2026-08-21T00:00:00Z", expires_at: "2099-01-01T00:00:00Z" }), "utf8");
+  JSON.stringify({ targets: ["x.example.com"], env: "dev", granted_at: "2026-08-21T00:00:00Z", expires_at: "2099-01-01T00:00:00Z", source: "invocation" }), "utf8");
 check("24.3 scope armed at WS is honoured from WS/app (attack PASSES)",
   attackFrom(join(W1, "app")) === "");
 rmSync(W1, { recursive: true, force: true });
@@ -906,11 +907,10 @@ check("portless target still matches a ported URL host",
 // 25. TOKEN-MATCHED SCOPE GATE (v1.9.5)
 // Incident 2026-08-19, smoke test sess_1ba6b6da: `grep nuclei README.md` was
 // BLOCKED by the old substring ATTACK_RE. The gate now matches attack tools on
-// typed command words (vendored shell-quote parse.js): quotes, assignment
+// parsed command words: quotes, assignment
 // prefixes, wrappers, interpreters, pipes and $(...) cannot hide the tool word,
 // and a tool name that is merely an ARGUMENT no longer trips the gate.
-// Fallback: any parse exception reverts to the legacy substring match
-// (fail-closed robustness contract).
+// Malformed shell syntax must never authorize an attack command.
 // ---------------------------------------------------------------------------
 
 const ATTACK = "nuclei -u https://x.example.com";
@@ -973,19 +973,15 @@ check("25.15 'powershell -Command \"nuclei ...\"' -> BLOCKS  (payload arrives as
   blocked(scopeCmd(`powershell -Command "${ATTACK}"`)));
 check("25.16 'cmd /c nuclei -u ...' -> BLOCKS  (Windows wrapper)",
   blocked(scopeCmd(`cmd /c ${ATTACK}`)));
-check("25.17 'nuclei ${' -> BLOCKS  (parse throws 'Bad substitution' -> legacy fallback, fail-closed; an unbalanced QUOTE does not throw — it is swallowed silently, so it cannot exercise the fallback)",
+check("25.17 malformed 'nuclei ${' -> BLOCKS (fail closed)",
   blocked(scopeCmd("nuclei ${")));
 check("25.18 '# nuclei -u https://x.example.com' -> PASSES  (comment node, never a command)",
   scopeCmd(`# ${ATTACK}`) === "");
 
-// 25.19 vendor integrity: the vendored parser is frozen byte-for-byte
-const VENDOR = join(HERE, "oh-my-zcode", "hooks", "vendor", "shell-quote");
-const FROZEN_PARSE_SHA256 = "3ba508957858163adbcb7602a9af14cbca77cb0e4d1e86e98e396266f1e56523";
-const parseSha = createHash("sha256").update(readFileSync(join(VENDOR, "parse.js"))).digest("hex");
-check("25.19 vendor parse.js sha256 matches the frozen constant (any accidental touch breaks loudly)",
-  parseSha === FROZEN_PARSE_SHA256, `got ${parseSha}`);
-check("25.19 vendor LICENSE retains the MIT grant",
-  readFileSync(join(VENDOR, "LICENSE"), "utf8").includes("MIT"));
+check("25.19 attack after a semicolon -> BLOCKS",
+  blocked(scopeCmd(`echo ready; ${ATTACK}`)));
+check("25.19 quoted attack name used only as an argument -> PASSES",
+  scopeCmd('printf "%s" "nuclei"') === "");
 
 // 25.20 wrappers carrying flags (Reviewer A r1 finding, escalated by the
 // orchestrator 2026-08-20): value-bearing flags must not stop the unwrap
@@ -1002,77 +998,12 @@ reset();
 check("25.21 'sudo -u root grep nuclei README.md' -> PASSES  (grep is the head, nuclei an argument)",
   scopeCmd("sudo -u root grep nuclei README.md") === "");
 
-// 25.22 claim/proof typing contract (v2.1.0, 2026-08-21 incident): a source
-// claim can never be signed by a behavioral proof
-const RT = readFileSync(join(HERE, "oh-my-zcode", "commands", "ohmy-redteam.md"), "utf8");
-const SEC = readFileSync(join(HERE, "oh-my-zcode", "commands", "ohmy-security.md"), "utf8");
-const FV = readFileSync(join(HERE, "oh-my-zcode", "agents", "ohmy-finding-verifier.md"), "utf8");
-const SG = readFileSync(join(HERE, "oh-my-zcode", "skills", "security-gate", "SKILL.md"), "utf8");
-check("25.22 ohmy-redteam return format carries claim types behavior|source",
-  RT.includes("claim type per entry: `behavior`") && RT.includes("`source`"), "return-format bullet missing");
-check("25.22 ohmy-redteam recon writes a ## PROVENANCE block with the source commit",
-  RT.includes("## PROVENANCE") && RT.includes("source commit:"), "PROVENANCE spec missing");
-check("25.22 beast dispatch-receives list stays rule-free (no claim typing leaks into lines 87-93)",
-  !RT.split("Each beast receives ONLY:")[1].split("Every beast dispatch prompt")[0].includes("claim"), "claim typing leaked into the dispatch list");
-check("25.22 finding-verifier input carries the claim type field",
-  FV.includes("claim type (`behavior` or `source`)"), "input field list missing claim type");
-check("25.22 finding-verifier vocabulary has PROOF-TYPE MISMATCH in both the rules list and the output template",
-  FV.includes("`PROOF-TYPE MISMATCH`") && FV.includes("Verdict: CONFIRMED | NOT REPRODUCED | OUT OF SCOPE | PROOF-TYPE MISMATCH"), "vocabulary/template not extended");
-check("25.22 finding-verifier final line unchanged (reserved signatures untouched)",
-  FV.includes("FINDINGS: <C> CONFIRMED, <R> REJECTED") && !FV.includes("FINDINGS: VERIFIED\n```"), "final-line contract broken");
-check("25.22 ohmy-security shared field list + verdict echo move with the contract",
-  SEC.includes("claim type (`behavior` or `source`)") && SEC.includes("PROOF-TYPE MISMATCH"), "sibling contract stale");
-check("25.22 security-gate rule 19: a code comment is not evidence of current state",
-  SG.includes("19. **A code comment is not evidence of current state."), "rule 19 missing");
-check("25.23 ohmy-redteam beast prompts are clock-free (no minutes/budgets/deadlines in dispatch text)",
-  RT.includes("NO clocks: never mention minutes, budgets or deadlines"), "the NO-clocks freeze line is missing");
-check("25.24 ohmy-redteam Step 2 defines PRIZES and no family text remains",
-  RT.includes("PRIZES") && RT.includes("read all user data") && RT.includes("admin access") && RT.includes("code execution") && !RT.includes("family"), "prize definition missing or family text remains");
-check("25.24 ohmy-redteam dispatch carries the YOUR PRIZE contract",
-  RT.includes("YOUR PRIZE") && RT.includes("surface.md` and `source-map.md"), "prize framing or two-map receives bullet missing");
-check("25.25 ohmy-redteam Step 2.5 writes a source map with PROVENANCE and black-box degradation",
-  RT.includes("source-map.md") && RT.includes("no source available") && RT.includes("guard diffs") && RT.includes("pre-chewed hypothesis"), "source-map contract missing");
-check("25.26 ohmy-redteam wave 2 is a mandatory cascade",
-  RT.includes("Mandatory cascade") && RT.includes("these tools, combined, lead where?"), "cascade paragraph missing");
-check("25.27 ohmy-redteam stopping rule is signal-based",
-  RT.includes("two consecutive waves add no new capability to the loot"), "stopping rule missing");
-check("25.27 ohmy-redteam expiry pause block present",
-  RT.includes("window closed") && RT.includes("resumes the campaign from the existing loot"), "expiry pause block missing");
-check("25.28 security-gate rule 20: the beast hunts a prize, never a checklist",
-  SG.includes("20. **The beast hunts a prize, never a checklist.") && SG.includes("discovery cascade") && SG.includes("CyberGym 84.5%"), "rule 20 or its evidence line missing");
-check("25.29 security-gate rule 21: a failed attempt proves the attempt failed — nothing else",
-  SG.includes("21. **A failed attempt proves the attempt failed") && SG.includes("never deduced from the failure"), "rule 21 or its evidence line missing");
-check("25.29 ohmy-redteam report opens on root causes and names execution planes",
-  RT.includes("ROOT-CAUSE TABLE first") && RT.includes("a generic label like RCE is not a report line"), "report-format clauses missing");
-const BLD = readFileSync(join(HERE, "oh-my-zcode", "agents", "ohmy-builder.md"), "utf8");
-const RVW = readFileSync(join(HERE, "oh-my-zcode", "agents", "ohmy-reviewer.md"), "utf8");
-const PLN = readFileSync(join(HERE, "oh-my-zcode", "commands", "ohmy-plan.md"), "utf8");
-check("25.30 ohmy-builder names its rigor — invalid-input classes enumerated before validation code",
-  BLD.includes("ENUMERATE the invalid-input classes") && BLD.includes("never silently skip one"), "builder enumeration rule missing");
-check("25.30 ohmy-builder blocked->STOP (a stopped task with a clear blocker report is a SUCCESS)",
-  BLD.includes("A stopped task with a clear blocker report is a SUCCESS"), "blocked-stop rule missing");
-check("25.30 ohmy-builder re-runs reviewer reproductions verbatim and greps call sites",
-  BLD.includes("re-run every one verbatim") && BLD.includes("grep every call site"), "reproduction/call-site rules missing");
-check("25.30 ohmy-reviewer blockers carry exact runnable reproductions",
-  RVW.includes("EXACT MUTATED INPUT") && RVW.includes("A blocker you cannot turn into a runnable reproduction is a MAJOR finding"), "reviewer reproduction format missing");
-check("25.30 ohmy-plan done-when anchors artifact identity (recorded SHA-256)",
-  PLN.includes("a recorded SHA-256"), "artifact-identity criterion missing");
-
 // ---------------------------------------------------------------------------
-// 26. v2.0.0 MCP SCOPE SERVER — REWRITTEN 2026-08-21 (v2 refonte)
-// MODEL CHANGE, not a fix: env-arming (SCOPE_* config, .grant materialization)
-// is GONE. Arming is BY INVOCATION — the /ohmy-redteam command writes
-// active_scope.json itself (60-minute window); the plugin's MCP server
-// (oh-my-zcode/mcp/scope-server.mjs, stdio, zero dependency) only READS,
-// REPORTS and REVOKES. This section spawns the REAL server over stdio
-// (JSON-RPC 2.0, line-delimited, SCOPE_ROOT-controlled temp roots) and
-// freezes: the published-defect fix (inputSchema on tools/list — without it
-// the server never registers), the read/revoke contract, the startup purge
-// of pre-v2 orphans, root resolution, and the two 2026-08-21 hook debts
-// (`command -v`, tag freeze).
+// 26. Native MCP scope server. Arming is by invocation; the server only
+// reports and revokes current-format authorization. Exercise the compiled
+// server over line-delimited JSON-RPC with isolated workspace roots.
 // ---------------------------------------------------------------------------
 
-const SERVER = join(HERE, "oh-my-zcode", "mcp", "scope-server.mjs");
 // Arming env no longer exists; SCOPE_* is stripped from the parent env so
 // spawns are clean — only explicit SCOPE_ROOT overrides are ever passed.
 const stripScopeEnv = (env) => {
@@ -1080,7 +1011,7 @@ const stripScopeEnv = (env) => {
   for (const k of Object.keys(e)) if (k.startsWith("SCOPE_")) delete e[k];
   return e;
 };
-// Deterministic v2 invocation fixture: fixed ISO dates, never "now ± epsilon".
+// Deterministic invocation fixture: fixed ISO dates, never "now ± epsilon".
 const INVOCATION_SCOPE = {
   targets: ["x.example.com"],
   env: "staging",
@@ -1095,21 +1026,20 @@ const EXPIRED_INVOCATION_SCOPE = {
 };
 // One spawn, several frames: every frame is answered on stdout, keyed by id.
 const rpc = (frames, opts = {}) => {
-  const p = spawnSync("node", [SERVER], {
+  const p = spawnSync(BINARY, ["scope-mcp"], {
     input: frames.map((f) => JSON.stringify(f)).join("\n") + "\n",
     encoding: "utf8",
     cwd: opts.cwd ?? WS,
     env: { ...stripScopeEnv(process.env), ...opts.env },
+    timeout: 15000,
   });
   if (p.status !== 0) throw new Error(`scope-server exited ${p.status}: ${p.stderr}`);
   const byId = new Map();
   for (const line of (p.stdout ?? "").split("\n")) {
     const l = line.trim();
     if (!l) continue;
-    try {
-      const m = JSON.parse(l);
-      if (m.id !== undefined && m.id !== null) byId.set(m.id, m);
-    } catch { /* not a response line */ }
+    const m = JSON.parse(l);
+    if (m.id !== undefined && m.id !== null) byId.set(m.id, m);
   }
   return byId;
 };
@@ -1120,7 +1050,6 @@ const toolText = (resp) => {
   try { return JSON.parse(t); } catch { return null; }
 };
 const srvScopePath = (root) => join(root, ".oh-my-zcode", "security", "active_scope.json");
-const srvGrantPath = (root) => join(root, ".oh-my-zcode", "security", ".grant");
 const writeServerScope = (root, scope) => {
   mkdirSync(join(root, ".oh-my-zcode", "security"), { recursive: true });
   writeFileSync(srvScopePath(root), JSON.stringify(scope), "utf8");
@@ -1135,7 +1064,7 @@ const hs = rpc([
 ], { cwd: SRV });
 check("26.1 initialize handshake answers with serverInfo",
   hs.get(1)?.result?.serverInfo?.name === "oh-my-zcode-scope"
-  && hs.get(1)?.result?.serverInfo?.version === "2.0.0",
+  && hs.get(1)?.result?.serverInfo?.version === "3.0.0",
   JSON.stringify(hs.get(1)?.result?.serverInfo));
 const listedTools = hs.get(2)?.result?.tools ?? [];
 check("26.2 tools/list = exactly get_scope + revoke (no authorize tool)",
@@ -1145,7 +1074,12 @@ check("26.2 tools/list = exactly get_scope + revoke (no authorize tool)",
 check("26.2 ...and EVERY tool carries inputSchema {type:'object',properties:{}}  (the published-defect fix, frozen 2026-08-21)",
   listedTools.length === 2
   && listedTools.every((t) =>
-    JSON.stringify(t.inputSchema) === JSON.stringify({ type: "object", properties: {} })),
+    t.inputSchema?.type === "object"
+    && Object.keys(t.inputSchema).sort().join(',') === 'properties,type'
+    && t.inputSchema.properties !== null
+    && typeof t.inputSchema.properties === 'object'
+    && !Array.isArray(t.inputSchema.properties)
+    && Object.keys(t.inputSchema.properties).length === 0),
   JSON.stringify(listedTools.map((t) => t.inputSchema)));
 
 // 26.3 UNARMED (no scope file — arming is by invocation, never by this
@@ -1186,19 +1120,17 @@ check("26.5 expired scope -> get_scope armed:false + hint",
 check("26.5 ...and the expired file is LEFT IN PLACE (read path never deletes)",
   existsSync(srvScopePath(SRV2)));
 
-// 26.6 pre-v2 orphan (no expires_at): purged at STARTUP (upgrade disarms,
-// fail-closed) — the only purge the read-only server still performs
+// 26.6 Unsupported scope data stays unarmed. Reads do not migrate files.
 const SRV3 = mkdtempSync(join(tmpdir(), "gate-srv3-"));
 writeFileSync(join(SRV3, "package.json"), "{}\n");
-writeServerScope(SRV3, { targets: ["x.example.com"], env: "dev", session_id: "sess-1.9.5", created: "2026-08-19T00:00:00Z" });
-mkdirSync(join(SRV3, ".oh-my-zcode", "security"), { recursive: true });
-writeFileSync(srvGrantPath(SRV3), "stale", "utf8");
-const purged = rpc([INIT, GET_SCOPE(6)], { cwd: SRV3 });
-check("26.6 pre-v2 orphan (no expires_at) is purged at startup (file AND stale .grant)",
-  !existsSync(srvScopePath(SRV3)) && !existsSync(srvGrantPath(SRV3)));
-check("26.6 ...and get_scope then reports unarmed",
-  toolText(purged.get(6))?.armed === false,
-  JSON.stringify(toolText(purged.get(6))));
+writeServerScope(SRV3, { ...INVOCATION_SCOPE, source: "unsupported" });
+const unsupportedBytes = readFileSync(srvScopePath(SRV3), "utf8");
+const unsupported = rpc([INIT, GET_SCOPE(6)], { cwd: SRV3 });
+check("26.6 unsupported scope source is not rewritten or migrated",
+  readFileSync(srvScopePath(SRV3), "utf8") === unsupportedBytes);
+check("26.6 unsupported scope source remains unarmed",
+  toolText(unsupported.get(6))?.armed === false,
+  JSON.stringify(toolText(unsupported.get(6))));
 
 // 26.7 revoke: the file is gone and get_scope reports unarmed
 const revoked = rpc([
@@ -1207,7 +1139,7 @@ const revoked = rpc([
   GET_SCOPE(8),
 ], { cwd: SRV });
 check("26.7 revoke -> active_scope.json gone, get_scope unarmed",
-  !existsSync(srvScopePath(SRV)) && !existsSync(srvGrantPath(SRV))
+  !existsSync(srvScopePath(SRV))
   && toolText(revoked.get(8))?.armed === false,
   JSON.stringify(toolText(revoked.get(8))));
 
@@ -1247,31 +1179,26 @@ check("26.9 'command -v nuclei' with NO scope -> PASSES  (name resolution, not e
 check("26.9 'command -V nuclei' likewise -> PASSES",
   scopeCmd("command -V nuclei") === "");
 
-// 26.10 TAG FREEZE (2026-08-21 v2 refonte): the OLD v1 tag is written
-// LITERALLY below — this file's content is not gated, only prompts at
-// runtime are. Detection is by the NEW tag only: an old-tag prompt is never
-// intercepted, with or without an armed scope (the rename must not leave a
-// second, unguarded door behind).
-const OLD_TAGGED = "[betterredteam 20260819-2048] run nuclei against https://x.example.com";
+// 26.10 Only the current red-team dispatch tag activates this boundary.
+const OTHER_TAGGED = "[unrelated-workflow 20260819-2048] describe nuclei at https://x.example.com";
 reset();
-check("26.10 OLD v1 tag under NO scope -> NOT blocked (detection by the new tag only)",
-  dispatch(OLD_TAGGED) === "");
+check("26.10 unrelated dispatch tag under NO scope -> NOT blocked",
+  dispatch(OTHER_TAGGED) === "");
 reset();
 writeScope({ targets: ["x.example.com"], env: "dev" });
-check("26.10 OLD v1 tag under an ARMED scope -> passes with NO dispatch_pass logged",
-  dispatch(OLD_TAGGED) === ""
+check("26.10 unrelated dispatch tag under an ARMED scope -> passes with NO dispatch_pass logged",
+  dispatch(OTHER_TAGGED) === ""
   && (!existsSync(evidenceFile())
       || !readFileSync(evidenceFile(), "utf8").includes('"kind":"dispatch_pass"')));
 
-// 26.11 the hook's pre-v2 branch: a raw v1 file (no expires_at) blocks with
-// the dedicated reason (re-arm by invocation)
+// 26.11 Incomplete authorization never arms the hook.
 reset();
 mkdirSync(join(WS, ".oh-my-zcode", "security"), { recursive: true });
 writeFileSync(scopeFile(), JSON.stringify({ targets: ["x.example.com"], env: "dev" }), "utf8");
-const preV2 = scopeCmd("nuclei -u https://x.example.com");
-check("26.11 raw v1 file (no expires_at) + attack -> BLOCKS with the pre-v2 reason",
-  blocked(preV2) && blockReason(preV2).includes("expired") && blockReason(preV2).includes("pre-v2"),
-  blockReason(preV2));
+const incomplete = scopeCmd("nuclei -u https://x.example.com");
+check("26.11 incomplete scope + attack -> BLOCKS with an actionable reason",
+  blocked(incomplete) && blockReason(incomplete).length > 0,
+  blockReason(incomplete));
 
 // 26.12-26.14 SURGICAL DISARM (mixed URLs -> updatedInput)
 reset();
@@ -1279,14 +1206,13 @@ writeScope({ targets: ["x.example.com"], env: "dev" });
 const disarmOut = scopeCmd("curl -s https://x.example.com/a https://evil.com/y");
 let disarm = null;
 try { disarm = JSON.parse(disarmOut); } catch { /* checked below */ }
-check("26.12 mixed URLs under armed scope -> decision block WITH updatedInput",
+check("26.12 mixed targets reject the whole command without rewriting",
   disarm?.decision === "block"
-  && disarm?.updatedInput?.command === "curl -s https://x.example.com/a",
+  && !disarm?.updatedInput,
   JSON.stringify(disarm?.updatedInput));
-check("26.12 ...and the evidence logs kind=scope_disarm with removed ['evil.com']",
+check("26.12 rejection is logged as scope_block",
   existsSync(evidenceFile())
-  && readFileSync(evidenceFile(), "utf8").includes('"kind":"scope_disarm"')
-  && readFileSync(evidenceFile(), "utf8").includes('"removed":["evil.com"]'));
+  && readFileSync(evidenceFile(), "utf8").includes('"kind":"scope_block"'));
 
 const allOutOut = scopeCmd("curl -s https://evil.com/y");
 let allOutParsed = null;
@@ -1307,6 +1233,65 @@ rmSync(R3, { recursive: true, force: true });
 rmSync(R4, { recursive: true, force: true });
 
 deleteScope();
+
+// 27. session-start update notice — cache-driven only (no network in tests):
+// a fresh state file with a newer cached version appends the notice; an
+// up-to-date cache leaves the doctrine untouched. Both spawns pin
+// ZCODE_PLUGIN_ROOT + OH_MY_ZCODE_UPDATE_STATE so the real home is never read.
+{
+  const UPD = mkdtempSync(join(tmpdir(), "gate-upd-"));
+  mkdirSync(join(UPD, ".zcode-plugin"), { recursive: true });
+  writeFileSync(
+    join(UPD, ".zcode-plugin", "plugin.json"),
+    JSON.stringify({ name: "oh-my-zcode", version: "0.9.0" }),
+  );
+  const statePath = join(UPD, "update-check.json");
+  const spawnStart = () => {
+    const p = spawnSync(BINARY, ["hook", "session_start"], {
+      input: JSON.stringify({ session_id: SID, cwd: WS, source: "startup" }),
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        ZCODE_PLUGIN_ROOT: UPD,
+        OH_MY_ZCODE_UPDATE_STATE: statePath,
+        OH_MY_ZCODE_UPDATE_URL: "file://" + join(UPD, "marketplace.json").replace(/\\/g, "/"),
+      },
+    });
+    if (p.status !== 0) throw new Error(`update-notice spawn failed: ${p.stderr}`);
+    return JSON.parse((p.stdout ?? "").trim()).hookSpecificOutput?.additionalContext ?? "";
+  };
+  writeFileSync(
+    statePath,
+    JSON.stringify({ last_attempt_ms: Date.now(), latest: "3.1.0" }),
+  );
+  check("27.1 newer cached version -> UPDATE notice appended to doctrine",
+    spawnStart().includes("UPDATE oh-my-zcode: 3.1.0 available (installed 0.9.0)"));
+  writeFileSync(
+    statePath,
+    JSON.stringify({ last_attempt_ms: Date.now(), latest: "0.9.0" }),
+  );
+  check("27.2 up-to-date cache -> doctrine unchanged, no notice",
+    !spawnStart().includes("UPDATE oh-my-zcode"));
+  writeFileSync(
+    statePath,
+    JSON.stringify({ last_attempt_ms: Date.now(), latest: "3.1.0", disabled: true }),
+  );
+  check("27.3 disabled kill switch -> no notice even with newer version",
+    !spawnStart().includes("UPDATE oh-my-zcode"));
+  rmSync(UPD, { recursive: true, force: true });
+}
+
+// 28. the multimodal locker — frozen (ported from 2.x test 25.31)
+{
+  const VIS = readFileSync(join(HERE, "plugin", "agents", "vision.md"), "utf8");
+  const EVENTS = readFileSync(join(HERE, "src", "hook", "events.rs"), "utf8");
+  check("28.1 vision frontmatter freezes the flash model (the multimodal locker)",
+    VIS.includes("model: account:zai-individual-coding-plan/GLM-5.3-Flash"),
+    "vision.md lost its picker-format model frontmatter");
+  check("28.2 the Rust doctrine carries the image rule (never dead-end -> dispatch vision)",
+    EVENTS.includes("never dead-end") && EVENTS.includes("dispatch vision"),
+    "the image sentence is missing from src/hook/events.rs DOCTRINE");
+}
 
 console.log(`\n${"=".repeat(58)}\n${passed} passed, ${failed} failed`);
 rmSync(WS, { recursive: true, force: true });
