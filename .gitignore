@@ -1,9 +1,11 @@
 .oh-my-zcode/
-.betterzcode/
-.version-stamp.json
-betterzcode/docs/models/
-betterzcode/gw.html
-betterzcode/gw2.html
-betterzcode/lw.html
 node_modules/
 .config/
+/target/
+/dist/
+
+/.omo/
+
+.betterzcode/
+exa-results/
+!plugin/vendor/codegraph/node_modules/
