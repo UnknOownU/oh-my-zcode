@@ -1,0 +1,1 @@
+{"version":3,"file":"go-module.d.ts","sourceRoot":"","sources":["../../src/resolution/go-module.ts"],"names":[],"mappings":"AAAA;;;;;;;;;GASG;AAKH,MAAM,WAAW,QAAQ;IACvB,gFAAgF;IAChF,UAAU,EAAE,MAAM,CAAC;IACnB,mEAAmE;IACnE,OAAO,EAAE,MAAM,CAAC;CACjB;AAED;;;;;;;GAOG;AACH,wBAAgB,YAAY,CAAC,WAAW,EAAE,MAAM,GAAG,QAAQ,GAAG,IAAI,CAiBjE"}

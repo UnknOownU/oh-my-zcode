@@ -1,0 +1,121 @@
+{
+  "description": "Evidence-gated pipeline: injects the doctrine at session start, logs executed proof and fetched sources, and locks the conclusion until proof exists.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "${ZCODE_PLUGIN_ROOT}/bin/oh-my-zcode",
+            "args": [
+              "hook",
+              "session_start"
+            ],
+            "timeoutMs": 5000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "${ZCODE_PLUGIN_ROOT}/bin/oh-my-zcode",
+            "args": [
+              "hook",
+              "evidence"
+            ],
+            "timeoutMs": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "WebFetch|WebSearch|webReader|webSearchPrime|web_reader|web_search_prime",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "${ZCODE_PLUGIN_ROOT}/bin/oh-my-zcode",
+            "args": [
+              "hook",
+              "sources"
+            ],
+            "timeoutMs": 5000
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "${ZCODE_PLUGIN_ROOT}/bin/oh-my-zcode",
+            "args": [
+              "hook",
+              "scope"
+            ],
+            "timeoutMs": 5000
+          },
+          {
+            "type": "process",
+            "command": "${ZCODE_PLUGIN_ROOT}/bin/oh-my-zcode",
+            "args": [
+              "hook",
+              "proof_start"
+            ],
+            "timeoutMs": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "${ZCODE_PLUGIN_ROOT}/bin/oh-my-zcode",
+            "args": [
+              "hook",
+              "dispatch"
+            ],
+            "timeoutMs": 5000
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "process",
+            "command": "${ZCODE_PLUGIN_ROOT}/bin/oh-my-zcode",
+            "args": [
+              "hook",
+              "stop"
+            ],
+            "timeoutMs": 8000
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "process",
+            "command": "${ZCODE_PLUGIN_ROOT}/bin/oh-my-zcode",
+            "args": [
+              "hook",
+              "evidence_failure"
+            ],
+            "timeoutMs": 5000
+          }
+        ]
+      }
+    ]
+  }
+}

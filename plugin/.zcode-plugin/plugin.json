@@ -1,0 +1,65 @@
+{
+  "name": "oh-my-zcode",
+  "version": "3.0.0",
+  "description": "Evidence-gated ZCode pipeline: separate builders, reviewers and verifiers; PASS requires a matched execution result and unchanged source/artifact fingerprints. Research checks fetched citations; security checks scoped execution and explicit reproduction contracts.",
+  "author": {
+    "name": "UnknOownU",
+    "url": "https://github.com/UnknOownU"
+  },
+  "license": "MIT",
+  "keywords": [
+    "code-review",
+    "qa",
+    "multi-agent",
+    "glm",
+    "pipeline",
+    "verification",
+    "evidence-gate",
+    "research",
+    "citations",
+    "security",
+    "pentest",
+    "red-team",
+    "impact",
+    "council"
+  ],
+  "agents": "agents",
+  "commands": "commands",
+  "skills": "skills",
+  "mcpServers": {
+    "scope": {
+      "type": "stdio",
+      "command": "${ZCODE_PLUGIN_ROOT}/bin/oh-my-zcode",
+      "args": [
+        "scope-mcp"
+      ]
+    },
+    "semgrep": {
+      "type": "stdio",
+      "command": "semgrep",
+      "args": [
+        "mcp"
+      ]
+    },
+    "osv-scanner": {
+      "type": "stdio",
+      "command": "osv-scanner",
+      "args": [
+        "experimental-mcp"
+      ]
+    },
+    "grep": {
+      "type": "http",
+      "url": "https://mcp.grep.app"
+    },
+    "codegraph": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${ZCODE_PLUGIN_ROOT}/vendor/codegraph/node_modules/@colbymchenry/codegraph/npm-shim.js",
+        "serve",
+        "--mcp"
+      ]
+    }
+  }
+}
