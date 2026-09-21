@@ -14,7 +14,8 @@
 <summary><strong>Table of Contents</strong></summary>
 
 - [Getting Started](#getting-started)
-- [The five commands](#the-five-commands)
+- [The six commands](#the-six-commands)
+  - [/ohmy-council](#ohmy-council)
   - [/ohmy-plan](#ohmy-plan)
   - [/ohmy-swarm](#ohmy-swarm)
   - [/ohmy-research](#ohmy-research)
@@ -41,7 +42,17 @@
 > [!NOTE]
 > Start a **new session** after installing — hooks are snapshotted at session start.
 
-## The five commands
+## The six commands
+
+### /ohmy-council
+
+Five independent lights on one idea, at any moment — a raw idea or a full brainstorm. The orchestrator freezes the current state into a strictly **neutral briefing** (verbatim quotes and file paths; a selection is a direction, and direction is forbidden), then dispatches a **blind council** in parallel. Three judges — feasibility, risk, value — state their criteria BEFORE reading the briefing (the reviewer pattern transposed). Two creatives: the innovator (novel angles ON the idea) and the explorer of unexplored territories, who **ideates from first principles BEFORE opening the briefing** — anti-anchoring by protocol. No member knows another exists; no debate (conformity is measured); aggregation is majority (≥ 2 of the 3 judges), never union; minority views and split verdicts stay verbatim. The report never recommends — the council informs, the user decides.
+
+```
+/ohmy-council  let players export montages of their best runs
+```
+
+Full design rationale — every mechanism and its measurement, the routing disclosure and the limits: [docs/council.md](docs/council.md).
 
 ### /ohmy-plan
 
@@ -124,6 +135,11 @@ The writer family exists so no orchestrator holds the pen: 🔵 `ohmy-explorer` 
 | 🟠 | `ohmy-verifier` | signs on execution evidence | `glm-5.3` / high |
 | 🟠 | `ohmy-source-verifier` | confronts each claim with its source | `glm-5.3` / high |
 | 🟠 | `ohmy-finding-verifier` | re-executes security findings, never re-reasons | `glm-5.3` / max |
+| 🟣 | `ohmy-council-analyst` | council judge — feasibility lens, blind, criteria before reading | `glm-5.3` / high |
+| 🟣 | `ohmy-council-skeptic` | council judge — risk lens, strongest honest case against | `glm-5.3` / high |
+| 🟣 | `ohmy-council-strategist` | council judge — value lens, should this exist at all | `glm-5.3` / high |
+| 🔵 | `ohmy-council-innovator` | council creative — novel angles ON the idea | `glm-5.3` / max |
+| 🔵 | `ohmy-council-explorer` | council creative — unexplored territories, ideates before reading | `glm-5.3` / max |
 
 Measured routing:
 
@@ -149,6 +165,7 @@ Set `max_tokens` to **131072** — the documented ceiling — and never below. Y
 ├── evidence/<session id>.jsonl     written by the hooks — proof
 ├── plans/<run>/                    scaffold.md, plan.md, report.md, evidence.jsonl
 ├── research/<run>/                 report.md, evidence.jsonl
+├── council/<run>/                  briefing.md, report.md
 └── security/
     ├── active_scope.json           written by /ohmy-redteam at invocation; expires in 60 minutes
     ├── loot.md                     the chain ledger
