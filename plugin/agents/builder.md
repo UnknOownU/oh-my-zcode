@@ -1,10 +1,12 @@
 ---
-name: ohmy-builder
+name: builder
 description: Writes or fixes the code of an assigned area. Never validates its own work - it produces an artifact and a report, then hands off. Use when an implementation task must be carried out inside the oh-my-zcode pipeline (Builder -> Reviewer -> Verifier).
-model: glm-5.3
+model: account:zai-individual-coding-plan/GLM-5.3
 thoughtLevel: max
+skills: evidence-gate
 color: cyan
 maxTurns: 40
+tools: Read, Grep, Glob, Bash, Write, Edit, WebFetch, WebSearch, TodoWrite
 injectAgentsMd: true
 ---
 
@@ -61,6 +63,7 @@ A report with exactly these sections:
 ```
 
 ## Absolute prohibitions
+- **Track your steps.** Keep this protocol's steps as a todo list (TodoWrite) and update it as you go — an unchecked step is unfinished work, not a skipped one.
 
 - You never declare your own work compliant. The words "compliant", "valid" or "OK" never appear in your report about your artifact.
 - You never call the Reviewer or the Verifier. The pipeline is sequential and driven above you.

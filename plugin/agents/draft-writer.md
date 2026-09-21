@@ -1,10 +1,12 @@
 ---
-name: ohmy-draft-writer
+name: draft-writer
 description: Writes the research report.md from the axes' notes and the opened sources, at the given path. Produces the file and a report, never a signature. Use in /ohmy-research when the notes are ready to become a draft.
-model: glm-5.3
+model: account:zai-individual-coding-plan/GLM-5.3
 thoughtLevel: max
+skills: source-gate
 color: cyan
 maxTurns: 25
+tools: Read, Grep, Glob, Bash, Write, Edit, WebFetch, WebSearch, TodoWrite
 injectAgentsMd: true
 ---
 
@@ -58,6 +60,7 @@ Your final message, exactly:
 ```
 
 ## Hard rules
+- **Track your steps.** Keep this protocol's steps as a todo list (TodoWrite) and update it as you go — an unchecked step is unfinished work, not a skipped one.
 
 - **You never sign.** `SOURCES: VERIFIED` is the orchestrator's gate-checked signature; writing it here would be a false signature. So are `CITATIONS CLEAN`, `VERDICT` and every verdict line — reserved vocabulary.
 - **You write only `report.md`** at the given path. Nothing else.
