@@ -50,12 +50,13 @@ when_to_use: when a plan or code change is being verified, routed, or its verdic
     *Against adding agents: Agentless (arXiv 2407.01489) reaches 32.00% on SWE-bench Lite at $0.70 against CodeR's 28.33% at $3.34; MAST (NeurIPS 2025, arXiv 2503.13657) measures 41 to 86.7% failure rates across 7 state-of-the-art multi-agent systems; and the gain is NON-MONOTONIC, since on hard queries more calls degrades the result (NeurIPS 2024, arXiv 2403.02419).*
 
 12. **Mandatory metrics**: correct->incorrect flips, false-OK rate, points consumed, EIR per model.
-    *Two records, two levels of trust. `.oh-my-zcode/evidence/<session>.jsonl` is written by the hooks: the model does not control it, so it is proof. `.oh-my-zcode/plans/<run>/report.md` is written by the agent: it is readable and structured, but it is testimony. The gate reads only the first.*
+    *Two records with different purposes. `.oh-my-zcode/evidence/<session>.jsonl` contains the hooks' execution receipts; `.oh-my-zcode/plans/<run>/report.md` is the agent's narrative. The gate reads the receipts. Both are local files: a process with workspace write access can tamper with them. This is an integrity check within a trusted workspace, not an OS security boundary.*
     *Comparing the two is what makes rule 12 measurable: the report claims a command ran, the hook log says whether it did.*
 
 13. **A subagent's proof cannot sign the main agent's verdict.** Whoever concludes runs the deciding command themselves, in the session that signs.
     *Measured (2026-08-17): a Verifier ran 16 real verification commands - docker, build, the full curl scenario - inside its subagent. Not one appeared in the evidence log, because ZCode hooks do not fire inside subagents. The run only passed the gate because the main agent happened to have run `tsc --noEmit` itself.*
     *Delegate the work, own the verdict.*
+    Since 3.0.0, a deciding command needs paired pre/post events, the expected numeric exit/output, and matching artifact SHA-256/revision before execution, after execution and at signature. Later edits invalidate it. Declare assertions and ignored build artifacts before running in `.oh-my-zcode/proof-policy.json`; never relax them to obtain PASS. See `docs/proof.md`. Failed proof remains rejected on Stop retries; an honest FAIL can end the turn.
 
 14. **Honest baseline**: compare the pipeline against "N Builders + majority vote" at equal token budget, never against a lone Builder.
     *Not yet run. Until it is, nobody knows whether this pipeline beats one good model called once, and this document says so rather than implying otherwise.*

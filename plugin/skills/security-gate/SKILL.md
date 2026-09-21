@@ -69,4 +69,4 @@ when_to_use: when any security test or red-team run is being planned, executed, 
 
 XBOW set via the MAPTA repo (104 web challenges), AutoPenBench (33 tasks, milestone credit), CyBench, NYU CTF. InterCode-CTF is saturated (95%) — do not practice on it.
 
-Caution: an agent declared with a custom `tools` allowlist cannot invoke skills — this plugin's agents use `disallowedTools`, so the constraint does not bite here; never introduce a `tools` allowlist on a judging agent without also allowing the skill tool.
+Caution: a custom agent's `tools:` allowlist replaces its default toolset entirely — but a declared `skills:` frontmatter auto-adds the Skill tool on top of it (measured in the runtime source and live, 2026-09-22). A custom agent with neither a `skills:` declaration nor Skill in its allowlist cannot load skills; every judging agent of this plugin declares its skills.
