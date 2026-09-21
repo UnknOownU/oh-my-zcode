@@ -39,8 +39,7 @@ invent.
 Dispatches are parallel, one-shot, and never mention the other members, previous council runs,
 or the orchestrator's opinion.
 
-*Evidence: debate between agents of the same model produces social conformity, not truth — up
-to 85.5% adoption of the majority error (evidence-gate rule 9). A panel that discusses
+*Evidence: debate between agents of the same model produces sycophantic conformity, not truth — agents adopt the majority answer in up to 85.5% of cases (Bertalanič & Fortuna 2026: small open models, reasoning tasks; evidence-gate rule 9). A panel that discusses
 converges on the first confident voice; a panel that answers blind converges on nothing, which
 is what the aggregation step is for.*
 
@@ -96,7 +95,11 @@ All five members run `glm-5.3`. The routing table below is an **unmeasured defau
 
 *Evidence: on the Coding Plan, `glm-5.2`/`glm-5.1`/`glm-5` are aliases answering as glm-5.3
 and `glm-4.5-air` answers as glm-4.7 — "model diversity" would be the same model under several
-names, with correlated errors dressed as independence (README law, source-gate rule 11). The
+names, with correlated errors dressed as independence (README law, source-gate rule 11). What
+carries the panel is role diversity, not the personas themselves: a persona alone does not
+improve model judgments (Zheng et al. 2024, arXiv 2311.10054), while a same-role panel
+degrades ("utilizing the same role description in the prompt can lead to a degradation in
+performance" — ChatEval, arXiv 2308.07201). The
 honest positions: lenses differ (different criteria, different methods, different outputs —
 that separation is real), errors correlate (that is the measured limit, stated below).*
 
@@ -132,6 +135,11 @@ the only model to have approved broken code); never an alias name (fake diversit
   structural (blindness, majority, criteria-before-reading) and presentational (minority views
   and divergence kept verbatim, so the reader sees the correlation instead of a smoothed
   verdict). What is not claimed: independence in the statistical sense.
+- **A verdict is a single sample.** The same judge run twice can answer differently — measured
+  inter-sample agreement α = 0.587, below the 0.659 of human annotators with each other
+  (Stureborg et al. 2024, arXiv 2405.01724). A split verdict is information about noise as
+  much as about the idea; on a high-stakes decision, re-run the council before trusting the
+  flip.
 - **The briefing is the residual bias surface.** The neutrality contract (verbatim, exhaustive
   or by pointer) is a discipline, not a mechanism — a determined orchestrator could still
   steer through selection. The report's "what the council could not see" section is where that
