@@ -113,8 +113,7 @@ fn state_path() -> PathBuf {
     }
     let home = std::env::var("USERPROFILE")
         .or_else(|_| std::env::var("HOME"))
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("."));
+        .map_or_else(|_| PathBuf::from("."), PathBuf::from);
     home.join(".zcode")
         .join("cli")
         .join("plugins")
@@ -135,14 +134,18 @@ fn save_state(state: &State) {
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    let _ = std::fs::write(&path, serde_json::to_string_pretty(state).unwrap_or_default());
+    let _ = std::fs::write(
+        &path,
+        serde_json::to_string_pretty(state).unwrap_or_default(),
+    );
 }
 
 fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_millis() as u64)
-        .unwrap_or(0)
+        .map_or(0, |duration| {
+            u64::try_from(duration.as_millis()).unwrap_or(0)
+        })
 }
 
 fn is_newer(candidate: &str, installed: &str) -> bool {
@@ -212,10 +215,8 @@ mod tests {
 
     #[test]
     fn state_round_trips_with_defaults() {
-        let state: State = serde_json::from_str(
-            r#"{"last_attempt_ms":123,"latest":"3.1.0"}"#,
-        )
-        .unwrap();
+        let state: State =
+            serde_json::from_str(r#"{"last_attempt_ms":123,"latest":"3.1.0"}"#).unwrap();
         assert_eq!(state.last_attempt_ms, 123);
         assert_eq!(state.latest.as_deref(), Some("3.1.0"));
         assert!(!state.disabled);

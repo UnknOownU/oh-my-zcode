@@ -23,7 +23,14 @@ pub(super) struct Agent {
     _mcp_servers: Option<IgnoredAny>,
 }
 
-const MODELS: &[&str] = &["glm-4.5", "glm-4.6", "glm-4.7", "glm-5-turbo", "glm-5.3", "glm-5.3-flash"];
+const MODELS: &[&str] = &[
+    "glm-4.5",
+    "glm-4.6",
+    "glm-4.7",
+    "glm-5-turbo",
+    "glm-5.3",
+    "glm-5.3-flash",
+];
 const ALIASES: &[&str] = &["glm-5", "glm-5.1", "glm-5.2", "glm-4.5-air"];
 const TOOLS: &[&str] = &[
     "Read",
@@ -84,13 +91,7 @@ fn check_agent(name: &str, agent: &Agent, root: &Path, report: &mut ValidationRe
             .split(',')
             .map(str::trim)
             .filter(|skill| !skill.is_empty())
-            .filter(|skill| {
-                !root
-                    .join("skills")
-                    .join(skill)
-                    .join("SKILL.md")
-                    .is_file()
-            })
+            .filter(|skill| !root.join("skills").join(skill).join("SKILL.md").is_file())
             .collect::<Vec<_>>();
         report.check(
             invalid.is_empty(),

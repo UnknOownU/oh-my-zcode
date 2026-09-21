@@ -26,9 +26,9 @@ pub(super) fn check(root: &Path, agents: &BTreeMap<String, Agent>, report: &mut 
             let bare = column.strip_prefix('`')?.strip_suffix('`')?;
             agents.get(bare).map(|_| bare.to_owned())
         }) else {
-            report.errors.push(
-                "README routing row has model / effort but no known agent name".to_owned(),
-            );
+            report
+                .errors
+                .push("README routing row has model / effort but no known agent name".to_owned());
             continue;
         };
         let Some(agent) = agents.get(&name) else {
