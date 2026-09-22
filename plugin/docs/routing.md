@@ -2,12 +2,26 @@
 
 > **Source of truth for this document**: measurements taken on 2026-08-17 on the user's GLM Coding Plan account
 > (endpoint `https://api.z.ai/api/coding/paas/v4`), cross-referenced with the 2024–2026 literature.
-> Every figure marked **[MEASURED]** comes from our own runs (raw data in `exp/`).
+> Every figure marked **[MEASURED]** comes from our own runs (raw data was never committed; the run reports carry the protocols).
 > Every figure marked **[PUBLISHED]** comes from a paper or a leaderboard, with its reference.
 
 ---
 
-## 0. TL;DR — the routing matrix
+## What runs TODAY (live config, 2026-09-22) — versus what is measured below
+
+The matrix in §0 is the **measured optimum, established 2026-08-17**. The live plugin config has since moved by owner decision, on top of that evidence:
+
+| Change | Live value | Status |
+|---|---|---|
+| Thinking effort | **every agent at `max`** | owner setting, 2026-09-21 — overrides the measured `high` for the judging roles (the reviewer's 6.2% false-reject was measured at `high`; see §2) |
+| Fast tier | **`glm-5.3-flash` on seven agents** — vision, verifier, source-verifier, finding-verifier, explorer, council-innovator, council-explorer | owner setting, 2026-09-22 — the judging-floor measurements below were established on `glm-5.3`, **not** on Flash: the verifier seats on Flash are unmeasured, watch false-OK on real runs. The `glm-5-turbo` rows below are the old fast tier; they transfer to Flash as analogy only |
+| Model pinning | every agent pinned `providerId/modelId` in its frontmatter | the alias law of §1 still applies — a bare name drops silently |
+
+The measurements that follow remain the evidence base. They are history, not the current dial settings.
+
+---
+
+## 0. TL;DR — the routing matrix (measured 2026-08-17)
 
 | Role | Model | Effort | Why (evidence) |
 |---|---|---|---|
