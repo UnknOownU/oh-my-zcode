@@ -1,0 +1,120 @@
+name: Pages marketplace
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (x.y.z), without the v'
+        required: true
+        default: '3.0.0'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  SITE_BASE: https://unknoownu.github.io/oh-my-zcode
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            binary: oh-my-zcode.exe
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+            binary: oh-my-zcode
+          - runner: macos-15
+            target: aarch64-apple-darwin
+            binary: oh-my-zcode
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+            binary: oh-my-zcode
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            binary: oh-my-zcode
+    runs-on: ${{ matrix.runner }}
+    env:
+      OHMY_ZCODE_BIN: ${{ github.workspace }}/target/${{ matrix.target }}/release/${{ matrix.binary }}
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: v${{ steps.ver.outputs.version }}
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: 1.96.0
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          key: ${{ matrix.target }}
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes musl-tools
+      - run: cargo build --release --locked --target "${{ matrix.target }}" -p oh-my-zcode
+      - name: Build immutable platform distribution
+        run: cargo run --locked -p xtask -- package --target "${{ matrix.target }}" --binary "$OHMY_ZCODE_BIN" --output dist --base-url "$SITE_BASE/${{ steps.ver.outputs.version }}/${{ matrix.target }}/"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pages-${{ matrix.target }}
+          path: dist/${{ matrix.target }}/
+          if-no-files-found: error
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: site/${{ needs.build.outputs.version }}
+      - name: Assemble the site
+        run: |
+          cd "site/${{ needs.build.outputs.version }}"
+          for dir in pages-*; do mv "$dir" "${dir#pages-}"; done
+          cd ..
+          {
+            echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>oh-my-zcode marketplace</title>'
+            echo '<style>body{font-family:system-ui;max-width:48rem;margin:2rem auto;padding:0 1rem}td,th{padding:.3rem .8rem;text-align:left;border-bottom:1px solid #ddd}code{background:#f4f4f4;padding:.1rem .3rem}</style>'
+            echo '</head><body><h1>oh-my-zcode native marketplace</h1>'
+            echo '<p>Add the URL for your platform in ZCode: Settings &rarr; Plugins &rarr; Create &rarr; Add marketplace.</p>'
+            echo '<table><tr><th>Platform</th><th>Marketplace URL</th></tr>'
+            for target in */; do
+              target="${target%/}"
+              echo "<tr><td><code>${target}</code></td><td><code>${SITE_BASE}/${{ needs.build.outputs.version }}/${target}/</code></td></tr>"
+            done
+            echo '</table></body></html>'
+          } > index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
