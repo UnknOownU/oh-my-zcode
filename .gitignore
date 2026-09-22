@@ -9,3 +9,5 @@ node_modules/
 .betterzcode/
 exa-results/
 !plugin/vendor/codegraph/node_modules/
+exa-results/
+.ci-artifacts/
