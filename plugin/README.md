@@ -70,13 +70,23 @@ Each command works alone; the chain above is the natural flow. The `SessionStart
 
 **Prerequisites**: a package matching your operating system and architecture. Version **3.0.0** includes a native Rust executable; users do not need to install Rust or Node for the hooks and scope server.
 
-In **Settings → Plugins → Create → Add marketplace**, add the published marketplace URL for your platform, then install `oh-my-zcode`. See [distribution and installation](docs/distribution.md) for Windows, macOS, Linux, local packages, and optional external servers. The source checkout is a development workspace.
+In **Settings → Plugins → Create → Add marketplace**, paste the URL for your platform:
+
+| Platform | Marketplace URL |
+|---|---|
+| Windows x64 | `https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-pc-windows-msvc/` |
+| macOS Apple Silicon | `https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-apple-darwin/` |
+| macOS Intel | `https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-apple-darwin/` |
+| Linux x64 | `https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-unknown-linux-musl/` |
+| Linux ARM64 | `https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-unknown-linux-musl/` |
+
+then install `oh-my-zcode`. The [index page](https://unknoownu.github.io/oh-my-zcode/) lists every published version. See [distribution and installation](docs/distribution.md) for local packages and optional external servers. The source checkout is a development workspace.
 
 Or let your agent do it: paste this into a fresh ZCode chat and follow its lead.
 
 ```text
 Install the oh-my-zcode plugin for me, end to end.
-1. Walk me through adding the marketplace: Settings → Plugins → Create → Add marketplace, paste https://github.com/UnknOownU/oh-my-zcode — stop and wait for my confirmation before the next step.
+1. Walk me through adding the marketplace: Settings → Plugins → Create → Add marketplace, paste https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-pc-windows-msvc/ (that is the Windows URL; the index at https://unknoownu.github.io/oh-my-zcode/ lists the other platforms) — stop and wait for my confirmation before the next step.
 2. Once added, walk me through installing the oh-my-zcode plugin from that marketplace (Personal → the new market → Install), and wait for my confirmation.
 3. Verify the install yourself: check that the directory ~/.zcode/cli/plugins/cache/unknoownu/oh-my-zcode/<version>/ exists and contains .zcode-plugin/plugin.json, agents/ and skills/.
 4. Tell me to restart ZCode completely — quit from the tray icon (closing the window is NOT enough), then relaunch. Wait for me to confirm I did it.
