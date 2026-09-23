@@ -10,21 +10,25 @@ The home of **BetterZcode** — an evidence-gated pipeline plugin for ZCode:
 - **6 commands** — `/ohmy-council`, `/ohmy-plan`, `/ohmy-swarm`, `/ohmy-research`, `/ohmy-security`, `/ohmy-redteam`
 - **4 mechanical gates** — hooks that block a success verdict no executed test supports, a report citing a page never fetched, a security finding never reproduced, and attack commands fired without an authorized test/dev scope
 
-**This repository builds the Oh My Zcode plugin.** The plugin assets live in [`plugin/`](plugin/README.md). Version **3.0.0** adds a universal package: a small Node launcher selects the bundled Rust executable for Windows x64, macOS Apple Silicon/Intel, or Linux x64/ARM64. No compiler is needed.
+**This repository builds the Oh My Zcode plugin.** The plugin assets live in [`plugin/`](plugin/README.md). Version **3.0.0** ships one native package per platform — no Node.js, compiler, or npm install required. A universal package with a single marketplace URL publishes with the next release.
 
 ## Install
 
-1. Install **Node.js 22 or newer**, with `node` available on `PATH`. Check with `node --version`, then fully restart ZCode if Node was just installed.
-2. If another copy is installed, uninstall it in **Settings → Plugins** first. Keep only one installation of `oh-my-zcode`.
-3. In **Settings → Plugins → Create → Add marketplace**, paste this exact JSON URL on **all supported platforms**:
+1. If another copy is installed, uninstall it in **Settings → Plugins** first. Keep only one installation of `oh-my-zcode`.
+2. In **Settings → Plugins → Create → Add marketplace**, paste the JSON URL for your machine:
 
-   ```text
-   https://unknoownu.github.io/oh-my-zcode/marketplace.json
-   ```
+   | Machine | Marketplace JSON URL |
+   |---|---|
+   | Windows x64 | `https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-pc-windows-msvc/marketplace.json` |
+   | macOS Apple Silicon (M1–M4) | `https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-apple-darwin/marketplace.json` |
+   | macOS Intel | `https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-apple-darwin/marketplace.json` |
+   | Linux x64 | `https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-unknown-linux-musl/marketplace.json` |
+   | Linux ARM64 | `https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-unknown-linux-musl/marketplace.json` |
 
-4. Open the added marketplace, install **`oh-my-zcode`**, quit ZCode completely, relaunch, and start a **new session**. On Windows, quit from the tray if the app remains running; on macOS, use **ZCode → Quit ZCode** or **⌘Q**.
+   On a Mac, **Apple menu → About This Mac** tells the chip: Apple M1–M4 is Apple Silicon; an Intel processor listing is Intel.
+3. Open the added marketplace, install **`oh-my-zcode`**, quit ZCode completely, relaunch, and start a **new session**. On Windows, quit from the tray if the app remains running; on macOS, use **ZCode → Quit ZCode** or **⌘Q**.
 
-The [download page](https://unknoownu.github.io/oh-my-zcode/) also lists native packages that do not need Node for the hooks or scope server. The [installation guide](plugin/docs/distribution.md) explains which JSON URL or extracted folder to use. A ZIP download URL and the HTML download page are **not marketplace inputs**.
+The [installation guide](plugin/docs/distribution.md) covers the same URLs, manual ZIP installs, and updates. A ZIP download URL and the HTML download page are **not marketplace inputs**.
 
 ## Update
 
