@@ -15,6 +15,7 @@ struct Marketplace {
 #[derive(Deserialize)]
 struct Plugin {
     version: String,
+    icon: String,
     source: Source,
 }
 #[derive(Deserialize)]
@@ -107,6 +108,10 @@ fn binds_marketplace_to_exact_archive_when_packaging() -> TestResult {
             serde_json::from_slice(&fs::read(output.join("marketplace.json"))?)?;
         assert_eq!(market.name, "unknoownu", "{target}");
         let plugin = market.plugins.first().ok_or("missing plugin")?;
+        assert_eq!(
+            plugin.icon,
+            "https://raw.githubusercontent.com/UnknOownU/oh-my-zcode/main/plugin/docs/brand/icon.svg"
+        );
         let bytes = fs::read(output.join(format!("plugins/oh-my-zcode/{VERSION}/plugin.zip")))?;
         assert_eq!(plugin.source.sha256, hex::encode(Sha256::digest(bytes)));
         assert_eq!(plugin.version, VERSION);

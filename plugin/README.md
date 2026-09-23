@@ -1,6 +1,8 @@
 <p align="center">
-  <strong>oh-my-zcode</strong> 🟣🟡🟠🔵
+  <img src="docs/brand/banner.svg" alt="Oh My Zcode — Build. Challenge. Prove." width="960">
 </p>
+
+# Oh My Zcode
 
 > **An agent that writes is never an agent that judges. A source it never opened is not a source.**
 
@@ -8,34 +10,43 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![ZCode Plugin](https://img.shields.io/badge/ZCode-plugin-8A2BE2.svg)](.zcode-plugin/plugin.json) [![GLM](https://img.shields.io/badge/models-GLM-5.3-blueviolet.svg)](docs/routing.md)
 
----
-
 <details>
-<summary><strong>Table of Contents</strong></summary>
+<summary>Table of Contents</summary>
 
-- [What this is](#what-this-is)
-- [The pipeline](#the-pipeline)
-- [Getting Started](#getting-started)
-- [Dependencies and network](#dependencies-and-network)
+- [About](#about)
+- [Installation](#installation)
+  - [Choose a marketplace](#choose-a-marketplace)
+  - [Install 3.0.0](#install-300)
+  - [Agent-assisted install prompt](#agent-assisted-install-prompt)
+- [Updating](#updating)
+- [Using Oh My Zcode](#using-oh-my-zcode)
+  - [The pipeline](#the-pipeline)
+  - [The six commands](#the-six-commands)
+    - [/ohmy-council](#ohmy-council)
+    - [/ohmy-plan](#ohmy-plan)
+    - [/ohmy-swarm](#ohmy-swarm)
+    - [/ohmy-research](#ohmy-research)
+    - [/ohmy-security](#ohmy-security)
+    - [/ohmy-redteam](#ohmy-redteam)
+  - [The four gates](#the-four-gates)
+- [Integrations](#integrations)
+  - [Dependencies and network](#dependencies-and-network)
+  - [Hooks](#hooks)
+  - [The MCP servers](#the-mcp-servers)
+- [Agents and models](#agents-and-models)
+  - [Roles and routing](#roles-and-routing)
+  - [Changing the routing](#changing-the-routing)
 - [Files and side effects](#files-and-side-effects)
-- [Hooks](#hooks)
-- [The six commands](#the-six-commands)
-  - [/ohmy-council](#ohmy-council)
-  - [/ohmy-plan](#ohmy-plan)
-  - [/ohmy-swarm](#ohmy-swarm)
-  - [/ohmy-research](#ohmy-research)
-  - [/ohmy-security](#ohmy-security)
-  - [/ohmy-redteam](#ohmy-redteam)
-- [The four gates — they block, they don't ask](#the-four-gates--they-block-they-dont-ask)
-- [The MCP servers](#the-mcp-servers)
-- [Who does what](#who-does-what)
-- [Advanced Topics](#advanced-topics)
+  - [Package contents](#package-contents)
+  - [Runtime data](#runtime-data)
+- [Development](#development)
+  - [Versioning](#versioning)
 - [Uninstalling](#uninstalling)
 - [License](#license)
 
 </details>
 
-## What this is
+## About
 
 An agent writes "done" and you believe it. This plugin makes it prove it instead:
 
@@ -45,7 +56,56 @@ An agent writes "done" and you believe it. This plugin makes it prove it instead
 
 It covers the whole life of a task: judging an idea, planning it, building it, researching it, and attacking it — each with its own pipeline and its own gate.
 
-## The pipeline
+## Installation
+
+### Choose a marketplace
+
+The current public release is **3.0.0**: a universal package and one native package per platform. Native packages need no Node.js for the hooks or the scope server. To install a native package, in **Settings → Plugins → Create → Add marketplace**, paste the JSON URL for the machine that runs ZCode — choose exactly one:
+
+```text
+Windows x64          https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-pc-windows-msvc/marketplace.json
+macOS Apple Silicon  https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-apple-darwin/marketplace.json
+macOS Intel          https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-apple-darwin/marketplace.json
+Linux x64            https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-unknown-linux-musl/marketplace.json
+Linux ARM64          https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-unknown-linux-musl/marketplace.json
+```
+
+On a Mac, **Apple menu → About This Mac** identifies the chip (Apple M1–M4 is Apple Silicon; an Intel processor listing is Intel). The recommended universal package — a small Node launcher over five native binaries — is live at `https://unknoownu.github.io/oh-my-zcode/marketplace.json` and requires **Node.js 22+**. Stable native aliases at `https://unknoownu.github.io/oh-my-zcode/latest/<target>/marketplace.json` are also live; the versioned URLs above remain valid. See [distribution and installation](docs/distribution.md).
+
+Today's live **3.0.0** native and universal marketplaces all use **`unknoownu`**, keeping the plugin identity `oh-my-zcode@unknoownu` stable. Earlier native distributions used `oh-my-zcode-<target>`; existing installations from those sources still have the old identity. Adding another `unknoownu` URL replaces the registered source, not the installed files; keep one source for your machine. Old target-named and local marketplaces remain separate identities.
+
+### Install 3.0.0
+
+1. If BetterZcode or another `oh-my-zcode` copy is installed from an older marketplace or a local folder, uninstall that copy first. Duplicate plugin identities can prevent installation.
+2. Open **Settings → Plugins → Create → Add marketplace** and paste the universal JSON URL (Node.js 22+), or one native JSON URL for your machine from the table above.
+3. Open the added marketplace and install `oh-my-zcode` once.
+4. Fully quit and relaunch ZCode, then start a **new session**. On Windows, quit from the tray when the process remains there; on macOS, use **ZCode → Quit ZCode** or **⌘Q**.
+
+For a manual local marketplace, **Add marketplace** takes a folder containing `marketplace.json`; it does not take the extracted plugin root. A ZIP download URL and the HTML download page are not marketplace sources. The [distribution guide](docs/distribution.md) documents the local wrapper and package layout. Keep one installed copy.
+
+### Agent-assisted install prompt
+
+Paste this into a fresh ZCode chat if you want the agent to guide the same sequence:
+
+```text
+Install the oh-my-zcode plugin for me, end to end.
+1. Ask me which machine runs ZCode, then open Settings → Plugins → Create → Add marketplace and add this exact JSON URL for that machine — Windows x64: https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-pc-windows-msvc/marketplace.json · macOS Apple Silicon: https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-apple-darwin/marketplace.json · macOS Intel: https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-apple-darwin/marketplace.json · Linux x64: https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-unknown-linux-musl/marketplace.json · Linux ARM64: https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-unknown-linux-musl/marketplace.json — stop and wait for my confirmation before the next step.
+2. If BetterZcode or another oh-my-zcode installation from an older marketplace or local folder exists, have me uninstall it first; duplicate identities can block installation. Then install oh-my-zcode once from the marketplace you added.
+3. Verify the installation by locating the host's actual installed_plugins.json, reading the oh-my-zcode entry's installPath, and checking that path for .zcode-plugin/plugin.json, agents/, commands/, and skills/. Do not assume an operating system, owner, or cache path.
+4. Ask me to fully quit and relaunch ZCode using the host OS's full-quit action, then start a new session.
+5. In the new session, confirm that /ohmy-plan, /ohmy-swarm, and /ohmy-research are available and that the session received the pipeline doctrine. Report any missing item.
+```
+
+> [!NOTE]
+> Restart ZCode after installing so MCP declarations reload, then start a **new session** so hooks reload.
+
+## Updating
+
+When moving from an old target-named or local marketplace to the live `unknoownu` marketplace, uninstall the old plugin before removing its marketplace, then add the desired new source and install once. After that, refresh `unknoownu` in ZCode's Plugins settings and choose the plugin update when offered. Fully quit and relaunch ZCode and start a new session after updating. The session-start notice only announces a newer version; it never installs or applies updates automatically. A same-version correction, including switching between the universal and native 3.0.0 packages, requires uninstalling the existing copy and performing a clean install once from the desired marketplace. See [distribution and installation](docs/distribution.md) for the published-pages endpoint and local package details.
+
+## Using Oh My Zcode
+
+### The pipeline
 
 ```
  an idea
@@ -71,52 +131,98 @@ Three independent tracks, when you need them:
 
 Each command works alone; the chain above is the natural flow. The `SessionStart` hook injects the doctrine into every session, so the rules hold even when you use none of the commands.
 
-## Getting Started
+### The six commands
 
-The current public release is **3.0.0**: a universal package and one native package per platform. Native packages need no Node.js for the hooks or the scope server. To install a native package, in **Settings → Plugins → Create → Add marketplace**, paste the JSON URL for the machine that runs ZCode — choose exactly one:
+#### /ohmy-council
 
-```text
-Windows x64          https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-pc-windows-msvc/marketplace.json
-macOS Apple Silicon  https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-apple-darwin/marketplace.json
-macOS Intel          https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-apple-darwin/marketplace.json
-Linux x64            https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-unknown-linux-musl/marketplace.json
-Linux ARM64          https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-unknown-linux-musl/marketplace.json
+**What it does:** submits an idea to five blind agents in parallel. Three judges — feasibility, risk, value — state their criteria BEFORE reading the briefing; two creatives — novel angles on the idea, unexplored territories — extend it (the explorer ideates from first principles before reading at all). No member knows another exists, no debate; aggregation is mechanical majority (≥ 2 of 3 judges), minority views stay verbatim.
+
+**When:** before anything is built — a raw one-liner or a full brainstorm.
+
+**You get:** three verdicts (`ENDORSE / RESERVE / REJECT`), convergence points, minority views, and proposals from both creatives — in `.oh-my-zcode/council/<run>/`. The report never recommends: the council informs, you decide.
+
+```
+/ohmy-council  let players export montages of their best runs
 ```
 
-On a Mac, **Apple menu → About This Mac** identifies the chip (Apple M1–M4 is Apple Silicon; an Intel processor listing is Intel). The recommended universal package — a small Node launcher over five native binaries — is live at `https://unknoownu.github.io/oh-my-zcode/marketplace.json` and requires **Node.js 22+**. Stable native aliases at `https://unknoownu.github.io/oh-my-zcode/latest/<target>/marketplace.json` are also live; the versioned URLs above remain valid. See [distribution and installation](docs/distribution.md).
+Design rationale, mechanism by mechanism: [docs/council.md](docs/council.md).
 
-Today's live **3.0.0** native and universal marketplaces all use **`unknoownu`**, keeping the plugin identity `oh-my-zcode@unknoownu` stable. Earlier native distributions used `oh-my-zcode-<target>`; existing installations from those sources still have the old identity. Adding another `unknoownu` URL replaces the registered source, not the installed files; keep one source for your machine. Old target-named and local marketplaces remain separate identities.
+#### /ohmy-plan
 
-### Install 3.0.0
+**What it does:** read-only reconnaissance of the real code (explorer) → `scaffold.md` (scaffold-writer) → the scaffold checked against the codebase (scaffold-critic) → `plan.md` (plan-writer, persisted before critique) → the plan checked against doctrine and codebase (plan-critic), findings routed back to the writer. The orchestrator never writes.
 
-1. If BetterZcode or another `oh-my-zcode` copy is installed from an older marketplace or a local folder, uninstall that copy first. Duplicate plugin identities can prevent installation.
-2. Open **Settings → Plugins → Create → Add marketplace** and paste the universal JSON URL (Node.js 22+), or one native JSON URL for your machine from the table above.
-3. Open the added marketplace and install `oh-my-zcode` once.
-4. Fully quit and relaunch ZCode, then start a **new session**. On Windows, quit from the tray when the process remains there; on macOS, use **ZCode → Quit ZCode** or **⌘Q**.
+**When:** before any code is written.
 
-For a manual local marketplace, **Add marketplace** takes a folder containing `marketplace.json`; it does not take the extracted plugin root. A ZIP download URL and the HTML download page are not marketplace sources. The [distribution guide](docs/distribution.md) documents the local wrapper and package layout. Keep one installed copy.
+**You get:** a validated plan marked **PLAN READY** in `.oh-my-zcode/plans/<run>/` — or blocked with concrete findings. No code is written.
 
-### Update
-
-When moving from an old target-named or local marketplace to the live `unknoownu` marketplace, uninstall the old plugin before removing its marketplace, then add the desired new source and install once. After that, refresh `unknoownu` in ZCode's Plugins settings and choose the plugin update when offered. Fully quit and relaunch ZCode and start a new session after updating. The session-start notice only announces a newer version; it never installs or applies updates automatically. A same-version correction, including switching between the universal and native 3.0.0 packages, requires uninstalling the existing copy and performing a clean install once from the desired marketplace. See [distribution and installation](docs/distribution.md) for the published-pages endpoint and local package details.
-
-### Agent-assisted install prompt
-
-Paste this into a fresh ZCode chat if you want the agent to guide the same sequence:
-
-```text
-Install the oh-my-zcode plugin for me, end to end.
-1. Ask me which machine runs ZCode, then open Settings → Plugins → Create → Add marketplace and add this exact JSON URL for that machine — Windows x64: https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-pc-windows-msvc/marketplace.json · macOS Apple Silicon: https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-apple-darwin/marketplace.json · macOS Intel: https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-apple-darwin/marketplace.json · Linux x64: https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-unknown-linux-musl/marketplace.json · Linux ARM64: https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-unknown-linux-musl/marketplace.json — stop and wait for my confirmation before the next step.
-2. If BetterZcode or another oh-my-zcode installation from an older marketplace or local folder exists, have me uninstall it first; duplicate identities can block installation. Then install oh-my-zcode once from the marketplace you added.
-3. Verify the installation by locating the host's actual installed_plugins.json, reading the oh-my-zcode entry's installPath, and checking that path for .zcode-plugin/plugin.json, agents/, commands/, and skills/. Do not assume an operating system, owner, or cache path.
-4. Ask me to fully quit and relaunch ZCode using the host OS's full-quit action, then start a new session.
-5. In the new session, confirm that /ohmy-plan, /ohmy-swarm, and /ohmy-research are available and that the session received the pipeline doctrine. Report any missing item.
+```
+/ohmy-plan  add a login page, sessions must survive a refresh
 ```
 
-> [!NOTE]
-> Restart ZCode after installing so MCP declarations reload, then start a **new session** so hooks reload.
+#### /ohmy-swarm
 
-## Dependencies and network
+**What it does:** the build loop. The builder implements, the reviewer judges in a fresh context (criteria first, commit-first verdicts), the verifier executes the deciding command — looping until both signatures are in. The orchestrator runs the deciding command itself: delegate the work, own the verdict.
+
+**When:** to implement a task. If `/ohmy-plan` already ran, the plan check is skipped.
+
+**You get:** shipped code and a `VERDICT: PASS` signed on executed evidence.
+
+```
+/ohmy-swarm fix the orders API pagination, it skips the last page
+```
+
+#### /ohmy-research
+
+**What it does:** frames the question, splits it into at most three axes, dispatches researchers that **fetch** the pages — a search snippet is never a source. The draft-writer turns the notes into `report.md`; the source-verifier confronts every claim with the source it names, blind to what the researcher concluded.
+
+**When:** any question whose answer cites external sources.
+
+**You get:** `report.md` and `SOURCES: VERIFIED` in `.oh-my-zcode/research/<run>/` — signed only after the orchestrator opened the sources itself, and the citation gate checks that signature against what was actually fetched this session.
+
+```
+/ohmy-research does GLM-5.3 actually benefit from chain-of-thought on code tasks?
+```
+
+#### /ohmy-security
+
+**What it does:** locks the scope in writing first (`scope.json`), enumerates the attack surface (`surface.md`), dispatches attackers by family — the scope gate blocks attack commands mechanically unless a test/dev scope is armed. The finding-verifier **re-executes** every candidate finding blind; a proof that cannot decide its claim's type (behavior vs. source) is rejected.
+
+**When:** a structured security check on an app you own.
+
+**You get:** a report where only reproduced findings enter, signed `FINDINGS: VERIFIED` — gate-checked.
+
+```
+/ohmy-security https://our-staging.example.com — full check, we own the staging box
+```
+
+#### /ohmy-redteam
+
+**What it does:** arms the scope by invocation — targets and environment derived from your argument, written to `active_scope.json` with a 60-minute expiry, `prod` refused outright. Then it hunts **prizes** (read all user data, admin access, code execution) instead of walking checklists: a white-box `source-map.md` from the target's own repo when available, attackers dispatched with target and objective only, waves cascading from each wave's loot until a prize is proven or two consecutive waves add no new capability.
+
+**When:** a full attack chain on an app you own.
+
+**You get:** proven prizes — impact demonstrated by sample or controlled callback, re-executed blind by the finding-verifier, cleanup re-verified — plus a detection report per prize, with every entry typed `behavior` or `source` and a `PROVENANCE` block for what was actually tested.
+
+```
+/ohmy-redteam https://staging.ourapp.io — full chain, we own staging
+```
+
+The cage is a guardrail, not an authorization oracle: hooks see main-session commands and dispatches, not subagent internals. It raises the bar mechanically; it does not replace the operator's judgment.
+
+### The four gates
+
+| Gate | Event | Refuses |
+|---|---|---|
+| **Evidence** | `Stop` | `VERDICT: PASS` without a successful matched check and fresh artifact fingerprint this turn |
+| **Citation** | `Stop` | `SOURCES: VERIFIED` citing a URL never fetched this session (failed fetches never count) |
+| **Findings** | `Stop` | `FINDINGS: VERIFIED` without a matched expected result and fresh artifact fingerprint this turn |
+| **Scope** | `PreToolUse` | recognized attack invocations without valid scope; unsupported execution or target forms; declared out-of-scope targets; tagged dispatches without explicit authorized URLs |
+
+Proof details, expected output assertions, built artifacts and host limits: [proof contract](docs/proof.md). Exact supported command forms and citation resource identity: [scoped execution](docs/scoped-execution.md).
+
+## Integrations
+
+### Dependencies and network
 
 The required runtime is a ZCode host and **Node.js 22+ on `PATH`**. Agent frontmatter routes the bundled roles to the ZAI Coding Plan models `account:zai-individual-coding-plan/GLM-5.3` and `account:zai-individual-coding-plan/GLM-5.3-Flash`, with the declared effort level. Model availability, account limits, and provider traffic follow the ZAI Coding Plan and ZCode host. Rust, Cargo, and a compiler are development-only requirements; the universal archive does not need them.
 
@@ -131,25 +237,7 @@ The update notice makes at most one anonymous `curl` GET per 24 hours, with a 2-
 
 Agents can also use the ZCode-provided WebFetch/WebSearch tools when a command asks for research. Those requests, the ZAI model calls, optional grep.app traffic, optional npm install, and configured Semgrep/OSV traffic are external network activity. The universal launcher itself never downloads a binary at runtime.
 
-## Files and side effects
-
-The installed plugin contains these public surfaces:
-
-| Path | Purpose |
-|---|---|
-| `.zcode-plugin/plugin.json` | plugin metadata and MCP declarations |
-| `agents/` | 17 role definitions and their ZAI Coding Plan frontmatter |
-| `commands/` | six slash-command definitions |
-| `skills/` | six pipeline and review skill definitions |
-| `hooks/hooks.json` | host hook matchers and launcher invocations |
-| `bin/` | the Node launcher and five bundled platform binaries in the 3.0.0 archive |
-| `vendor/codegraph/` | optional npm package manifest and lockfile |
-
-Commands and hooks write project-local `.oh-my-zcode/` state. Depending on the command, this includes `evidence/`, `plans/`, `research/`, `council/`, and `security/` records; the security commands may also write scope and loot files. The update notice writes its rate-limit/disable state to the per-user ZCode plugin-data directory described above.
-
-Agent work can execute shell commands through the ZCode delegated scope. The host shows those commands to the session, and the evidence/proof hooks record the results. `/ohmy-security` and `/ohmy-redteam` require an authorized test/dev scope for recognized attack commands; the scope gate blocks unsupported or out-of-scope requests. Review [scoped execution](docs/scoped-execution.md) before granting a target.
-
-## Hooks
+### Hooks
 
 The host reads hook declarations when ZCode starts. Install or update the plugin, fully quit and relaunch ZCode, and start a new session so both MCP declarations and hooks reload.
 
@@ -165,96 +253,7 @@ The host reads hook declarations when ZCode starts. Install or update the plugin
 
 The launcher restores the executable bit with `chmod +x` for the selected POSIX binary when an official packager has stripped it. It only changes that local file mode; it does not download a replacement binary.
 
-## The six commands
-
-### /ohmy-council
-
-**What it does:** submits an idea to five blind agents in parallel. Three judges — feasibility, risk, value — state their criteria BEFORE reading the briefing; two creatives — novel angles on the idea, unexplored territories — extend it (the explorer ideates from first principles before reading at all). No member knows another exists, no debate; aggregation is mechanical majority (≥ 2 of 3 judges), minority views stay verbatim.
-
-**When:** before anything is built — a raw one-liner or a full brainstorm.
-
-**You get:** three verdicts (`ENDORSE / RESERVE / REJECT`), convergence points, minority views, and proposals from both creatives — in `.oh-my-zcode/council/<run>/`. The report never recommends: the council informs, you decide.
-
-```
-/ohmy-council  let players export montages of their best runs
-```
-
-Design rationale, mechanism by mechanism: [docs/council.md](docs/council.md).
-
-### /ohmy-plan
-
-**What it does:** read-only reconnaissance of the real code (explorer) → `scaffold.md` (scaffold-writer) → the scaffold checked against the codebase (scaffold-critic) → `plan.md` (plan-writer, persisted before critique) → the plan checked against doctrine and codebase (plan-critic), findings routed back to the writer. The orchestrator never writes.
-
-**When:** before any code is written.
-
-**You get:** a validated plan marked **PLAN READY** in `.oh-my-zcode/plans/<run>/` — or blocked with concrete findings. No code is written.
-
-```
-/ohmy-plan  add a login page, sessions must survive a refresh
-```
-
-### /ohmy-swarm
-
-**What it does:** the build loop. The builder implements, the reviewer judges in a fresh context (criteria first, commit-first verdicts), the verifier executes the deciding command — looping until both signatures are in. The orchestrator runs the deciding command itself: delegate the work, own the verdict.
-
-**When:** to implement a task. If `/ohmy-plan` already ran, the plan check is skipped.
-
-**You get:** shipped code and a `VERDICT: PASS` signed on executed evidence.
-
-```
-/ohmy-swarm fix the orders API pagination, it skips the last page
-```
-
-### /ohmy-research
-
-**What it does:** frames the question, splits it into at most three axes, dispatches researchers that **fetch** the pages — a search snippet is never a source. The draft-writer turns the notes into `report.md`; the source-verifier confronts every claim with the source it names, blind to what the researcher concluded.
-
-**When:** any question whose answer cites external sources.
-
-**You get:** `report.md` and `SOURCES: VERIFIED` in `.oh-my-zcode/research/<run>/` — signed only after the orchestrator opened the sources itself, and the citation gate checks that signature against what was actually fetched this session.
-
-```
-/ohmy-research does GLM-5.3 actually benefit from chain-of-thought on code tasks?
-```
-
-### /ohmy-security
-
-**What it does:** locks the scope in writing first (`scope.json`), enumerates the attack surface (`surface.md`), dispatches attackers by family — the scope gate blocks attack commands mechanically unless a test/dev scope is armed. The finding-verifier **re-executes** every candidate finding blind; a proof that cannot decide its claim's type (behavior vs. source) is rejected.
-
-**When:** a structured security check on an app you own.
-
-**You get:** a report where only reproduced findings enter, signed `FINDINGS: VERIFIED` — gate-checked.
-
-```
-/ohmy-security https://our-staging.example.com — full check, we own the staging box
-```
-
-### /ohmy-redteam
-
-**What it does:** arms the scope by invocation — targets and environment derived from your argument, written to `active_scope.json` with a 60-minute expiry, `prod` refused outright. Then it hunts **prizes** (read all user data, admin access, code execution) instead of walking checklists: a white-box `source-map.md` from the target's own repo when available, attackers dispatched with target and objective only, waves cascading from each wave's loot until a prize is proven or two consecutive waves add no new capability.
-
-**When:** a full attack chain on an app you own.
-
-**You get:** proven prizes — impact demonstrated by sample or controlled callback, re-executed blind by the finding-verifier, cleanup re-verified — plus a detection report per prize, with every entry typed `behavior` or `source` and a `PROVENANCE` block for what was actually tested.
-
-```
-/ohmy-redteam https://staging.ourapp.io — full chain, we own staging
-```
-
-The cage is a guardrail, not an authorization oracle: hooks see main-session commands and dispatches, not subagent internals. It raises the bar mechanically; it does not replace the operator's judgment.
-
-## The four gates — they block, they don't ask
-
-| Gate | Event | Refuses |
-|---|---|---|
-| **Evidence** | `Stop` | `VERDICT: PASS` without a successful matched check and fresh artifact fingerprint this turn |
-| **Citation** | `Stop` | `SOURCES: VERIFIED` citing a URL never fetched this session (failed fetches never count) |
-| **Findings** | `Stop` | `FINDINGS: VERIFIED` without a matched expected result and fresh artifact fingerprint this turn |
-| **Scope** | `PreToolUse` | recognized attack invocations without valid scope; unsupported execution or target forms; declared out-of-scope targets; tagged dispatches without explicit authorized URLs |
-
-Proof details, expected output assertions, built artifacts and host limits: [proof contract](docs/proof.md). Exact supported command forms and citation resource identity: [scoped execution](docs/scoped-execution.md).
-
-## The MCP servers
+### The MCP servers
 
 The plugin ships **five** MCP servers, declared in [`.zcode-plugin/plugin.json`](.zcode-plugin/plugin.json) — the official ZCode nomenclature, measured registering at cold start (2026-08-21). Measured law: the host reads plugin MCP declarations **only at app start** — install or update the plugin, then restart ZCode, or the servers will not appear in the session.
 
@@ -268,7 +267,9 @@ The plugin ships **five** MCP servers, declared in [`.zcode-plugin/plugin.json`]
 
 An unavailable external server is isolated: the bundled `scope` server and gates remain independent. Codegraph requires Node; the first-party runtime does not.
 
-## Who does what
+## Agents and models
+
+### Roles and routing
 
 The writer family exists so no orchestrator holds the pen: 🔵 `explorer` reads, 🔵 the writers produce artifacts, 🟣 the critics judge them.
 
@@ -307,9 +308,38 @@ Never route a role to `glm-5.2`, `glm-5.1`, `glm-5` or `glm-4.5-air`: on the Cod
 
 Set `max_tokens` to **131072** — the documented ceiling — and never below. You are billed for the tokens generated, not for the limit you allow, and a cut-off response cannot carry a verdict.
 
-## Advanced Topics
+### Changing the routing
 
-### What lands on disk
+Each role's model and thinking level live in one place: the agent's frontmatter in `agents/*.md`.
+
+```yaml
+model: account:zai-individual-coding-plan/GLM-5.3
+thoughtLevel: max
+```
+
+Full evidence for every routing decision: [docs/routing.md](docs/routing.md). The native validator checks routing declarations against the agent files.
+
+## Files and side effects
+
+### Package contents
+
+The installed plugin contains these public surfaces:
+
+| Path | Purpose |
+|---|---|
+| `.zcode-plugin/plugin.json` | plugin metadata and MCP declarations |
+| `agents/` | 17 role definitions and their ZAI Coding Plan frontmatter |
+| `commands/` | six slash-command definitions |
+| `skills/` | six pipeline and review skill definitions |
+| `hooks/hooks.json` | host hook matchers and launcher invocations |
+| `bin/` | the Node launcher and five bundled platform binaries in the 3.0.0 archive |
+| `vendor/codegraph/` | optional npm package manifest and lockfile |
+
+Commands and hooks write project-local `.oh-my-zcode/` state. Depending on the command, this includes `evidence/`, `plans/`, `research/`, `council/`, and `security/` records; the security commands may also write scope and loot files. The update notice writes its rate-limit/disable state to the per-user ZCode plugin-data directory described above.
+
+Agent work can execute shell commands through the ZCode delegated scope. The host shows those commands to the session, and the evidence/proof hooks record the results. `/ohmy-security` and `/ohmy-redteam` require an authorized test/dev scope for recognized attack commands; the scope gate blocks unsupported or out-of-scope requests. Review [scoped execution](docs/scoped-execution.md) before granting a target.
+
+### Runtime data
 
 ```
 .oh-my-zcode/
@@ -325,18 +355,7 @@ Set `max_tokens` to **131072** — the documented ceiling — and never below. Y
 
 The evidence log carries `kind: "evidence"` for a command that ran, `kind: "source"` for a page fetched, `kind: "search"` for a query — logged, never counted as reading. The gate reads only the hook log, never the report.
 
-### Changing the routing
-
-Each role's model and thinking level live in one place: the agent's frontmatter in `agents/*.md`.
-
-```yaml
-model: account:zai-individual-coding-plan/GLM-5.3
-thoughtLevel: max
-```
-
-Full evidence for every routing decision: [docs/routing.md](docs/routing.md). The native validator checks routing declarations against the agent files.
-
-### Development
+## Development
 
 ```bash
 cargo build --locked
