@@ -84,7 +84,7 @@ const makeFixture = (withRuntime = true) => {
     assert.match(result.stderr, /stderr-marker/);
     const observed = JSON.parse(result.stdout.trim());
     assert.deepEqual(observed.args, ["space value", "--flag=x y", ""]);
-    assert.equal(observed.root, fixture.root);
+    assert.equal(observed.root, realpathSync(fixture.root));
     assert.equal(observed.stdin, "stdin-marker");
     if (process.platform !== "win32") {
       assert.notEqual(statSync(fixture.payload).mode & 0o100, 0);
