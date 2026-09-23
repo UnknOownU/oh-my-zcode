@@ -12,6 +12,7 @@ struct Marketplace {
 #[derive(Deserialize)]
 struct Plugin {
     version: String,
+    icon: String,
     source: Source,
 }
 
@@ -92,6 +93,10 @@ fn assert_marketplace(fixture: &Fixture, archive: &[u8]) -> TestResult {
     )?)?;
     assert_eq!(marketplace.name, "unknoownu");
     let plugin = marketplace.plugins.first().ok_or("missing plugin")?;
+    assert_eq!(
+        plugin.icon,
+        "https://raw.githubusercontent.com/UnknOownU/oh-my-zcode/main/plugin/docs/brand/icon.svg"
+    );
     assert_eq!(plugin.version, VERSION);
     assert_eq!(plugin.source.path, "oh-my-zcode");
     assert_eq!(plugin.source.sha256, hex::encode(Sha256::digest(archive)));

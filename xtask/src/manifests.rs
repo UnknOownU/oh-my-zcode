@@ -210,6 +210,7 @@ pub(crate) struct Owner {
 #[derive(Debug, Serialize)]
 pub(crate) struct Listing<'a> {
     pub(crate) name: &'a str,
+    pub(crate) icon: &'static str,
     pub(crate) version: &'a str,
     pub(crate) description: &'a str,
     pub(crate) source: Source<'a>,

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title description">
+  <title id="title">Oh My Zcode icon — Fourfold Proof</title>
+  <desc id="description">Four independent gate corners in violet, cyan, amber, and coral surround a white Z-shaped execution path.</desc>
+  <rect x="1" y="1" width="254" height="254" rx="36" fill="#111827" stroke="#64748b" stroke-width="2"/>
+  <g fill="none" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M42 94V58Q42 42 58 42H94" stroke="#b7a0ff"/>
+    <path d="M162 42H198Q214 42 214 58V94" stroke="#67dbe6"/>
+    <path d="M214 162V198Q214 214 198 214H162" stroke="#f8bc6c"/>
+    <path d="M94 214H58Q42 214 42 198V162" stroke="#f99f9a"/>
+    <path d="M86 86H170L86 170H170" stroke="#f8fafc" stroke-width="18"/>
+  </g>
+</svg>

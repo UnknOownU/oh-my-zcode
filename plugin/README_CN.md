@@ -1,12 +1,52 @@
-# oh-my-zcode
+<p align="center">
+  <img src="docs/brand/banner.svg" alt="Oh My Zcode — 构建、质疑、证明。" width="960">
+</p>
 
-[English](README.md) · [简体中文](README_CN.md)
+# Oh My Zcode
 
 > **写代码的 agent 不负责给自己的工作判分；没有打开过的来源不算来源。**
 
+[English](README.md) · [简体中文](README_CN.md)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![ZCode Plugin](https://img.shields.io/badge/ZCode-plugin-8A2BE2.svg)](.zcode-plugin/plugin.json) [![GLM](https://img.shields.io/badge/models-GLM-5.3-blueviolet.svg)](docs/routing.md)
 
-## 这是什么
+<details>
+<summary>目录</summary>
+
+- [关于](#关于)
+- [安装](#安装)
+  - [选择 marketplace](#选择-marketplace)
+  - [安装 3.0.0](#安装-300)
+  - [让 agent 协助安装](#让-agent-协助安装)
+- [更新](#更新)
+- [使用 Oh My Zcode](#使用-oh-my-zcode)
+  - [流水线](#流水线)
+  - [六个命令](#六个命令)
+    - [/ohmy-council](#ohmy-council)
+    - [/ohmy-plan](#ohmy-plan)
+    - [/ohmy-swarm](#ohmy-swarm)
+    - [/ohmy-research](#ohmy-research)
+    - [/ohmy-security](#ohmy-security)
+    - [/ohmy-redteam](#ohmy-redteam)
+  - [四个门控](#四个门控)
+- [集成](#集成)
+  - [依赖和网络](#依赖和网络)
+  - [Hooks](#hooks)
+  - [MCP servers](#mcp-servers)
+- [角色和模型](#角色和模型)
+  - [角色和路由](#角色和路由)
+  - [修改路由](#修改路由)
+- [文件和副作用](#文件和副作用)
+  - [安装包内容](#安装包内容)
+  - [运行数据](#运行数据)
+- [开发](#开发)
+  - [版本策略](#版本策略)
+- [卸载](#卸载)
+- [许可证](#许可证)
+
+</details>
+
+## 关于
 
 oh-my-zcode 是一个带证据门控的 ZCode 插件。它把写入、评审和验证分给不同角色，并把结论绑定到真实执行结果：
 
@@ -14,23 +54,9 @@ oh-my-zcode 是一个带证据门控的 ZCode 插件。它把写入、评审和�
 - **4 个原生门控**：没有匹配执行证据的 `VERDICT: PASS`、没有抓取过的来源、没有复现的安全发现、没有授权范围的攻击命令都会被阻止。
 - **项目内证据**：计划、报告、证明日志和安全记录写入磁盘，便于事后核查。
 
-流水线原则保持不变：
+## 安装
 
-```text
-想法
-  ↓
-/ohmy-council   五个盲评角色：继续、调整或放弃
-  ↓
-/ohmy-plan      读取真实代码 → scaffold → plan → 校验
-  ↓
-/ohmy-swarm     构建 → 评审 → 验证，直到签名齐全
-  ↓
-完成：代码交付，PASS 只引用已执行的证据
-```
-
-`/ohmy-research`、`/ohmy-security` 和 `/ohmy-redteam` 也可以单独使用。`SessionStart` hook 会把原则注入每个会话，即使没有运行命令也会生效。
-
-## 安装和更新
+### 选择 marketplace
 
 当前公开版本是 **3.0.0**：提供一个通用包及每个平台的原生包。原生包的 hooks 和 scope server 不需要 Node.js。安装原生包时，在 **Settings → Plugins → Create → Add marketplace** 中，粘贴运行 ZCode 的那台机器对应的 JSON URL（只选一个）：
 
@@ -55,10 +81,6 @@ Linux ARM64          https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-unkno
 
 手动添加本地 marketplace 时，**Add marketplace** 接受的是包含 `marketplace.json` 的文件夹，不是解压后的插件根目录。ZIP 下载 URL 和 HTML 下载页面都不是 marketplace 源。[分发指南](docs/distribution.md)说明本地 wrapper、包布局和可选服务。请始终只保留一个已安装副本。
 
-### 更新
-
-从旧的按平台命名或本地 marketplace 迁移到已上线的 `unknoownu` marketplace 时，请先卸载旧插件，再移除旧 marketplace，然后添加所需的新源并只安装一次。此后，在 ZCode 的 Plugins 设置中刷新 `unknoownu`，并在主机提供新版本时选择插件更新。更新后完全退出并重新启动 ZCode，再开始新会话。会话开始时的提示只会通知有新版本，不会自动下载或安装更新。同一版本的修正（包括在通用包和原生 3.0.0 包之间切换）需要先卸载现有副本，再从目标 marketplace 完整安装一次。发布页面 endpoint 和本地包细节见[分发与安装](docs/distribution.md)。
-
 ### 让 agent 协助安装
 
 可以把下面的内容粘贴到新的 ZCode 会话中：
@@ -74,7 +96,76 @@ Linux ARM64          https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-unkno
 
 安装或更新后必须重启 ZCode 才能重新读取 MCP 声明，并开始新会话才能重新加载 hooks。
 
-## 依赖和网络
+## 更新
+
+从旧的按平台命名或本地 marketplace 迁移到已上线的 `unknoownu` marketplace 时，请先卸载旧插件，再移除旧 marketplace，然后添加所需的新源并只安装一次。此后，在 ZCode 的 Plugins 设置中刷新 `unknoownu`，并在主机提供新版本时选择插件更新。更新后完全退出并重新启动 ZCode，再开始新会话。会话开始时的提示只会通知有新版本，不会自动下载或安装更新。同一版本的修正（包括在通用包和原生 3.0.0 包之间切换）需要先卸载现有副本，再从目标 marketplace 完整安装一次。发布页面 endpoint 和本地包细节见[分发与安装](docs/distribution.md)。
+
+## 使用 Oh My Zcode
+
+### 流水线
+
+流水线原则保持不变：
+
+```text
+想法
+  ↓
+/ohmy-council   五个盲评角色：继续、调整或放弃
+  ↓
+/ohmy-plan      读取真实代码 → scaffold → plan → 校验
+  ↓
+/ohmy-swarm     构建 → 评审 → 验证，直到签名齐全
+  ↓
+完成：代码交付，PASS 只引用已执行的证据
+```
+
+`/ohmy-research`、`/ohmy-security` 和 `/ohmy-redteam` 也可以单独使用。`SessionStart` hook 会把原则注入每个会话，即使没有运行命令也会生效。
+
+### 六个命令
+
+#### `/ohmy-council`
+
+并行提交一个想法给五个盲评角色：可行性、风险、价值三个评审，以及创新和未探索领域两个创意角色。评审在阅读 briefing 前先写标准，聚合按三个评审中至少两个的多数票计算；少数意见保持原文。结果写入 `.oh-my-zcode/council/<run>/`。
+
+```text
+/ohmy-council  让玩家导出最佳对局的混剪
+```
+
+机制说明见[council 文档](docs/council.md)。
+
+#### `/ohmy-plan`
+
+explorer 只读侦察真实代码，scaffold-writer 写入 `scaffold.md`，scaffold-critic 校验，plan-writer 写入 `plan.md`，plan-critic 再根据代码和原则检查。编排器不写入计划文件。计划执行前使用此命令；结果位于 `.oh-my-zcode/plans/<run>/`，可能标记为 `PLAN READY` 或带具体问题的阻塞状态。
+
+#### `/ohmy-swarm`
+
+builder 实现，reviewer 在新上下文中评审，verifier 执行决定性命令；循环直到评审和验证签名齐全。结果是基于执行证据的 `VERDICT: PASS`。
+
+#### `/ohmy-research`
+
+把问题拆成最多三个方向，并要求研究角色实际抓取页面；搜索摘要不算来源。draft-writer 写 `report.md`，source-verifier 逐条对照来源，最后在 `.oh-my-zcode/research/<run>/` 产生带 `SOURCES: VERIFIED` 的报告。
+
+#### `/ohmy-security`
+
+先把范围写入 `scope.json`，再生成 `surface.md` 并按类别派发检查。scope gate 会阻止未授权的攻击命令；finding-verifier 会盲测复现每个候选发现。只有复现的发现进入报告，并以 `FINDINGS: VERIFIED` 标记。
+
+#### `/ohmy-redteam`
+
+根据调用参数锁定目标和环境，写入有效期 60 分钟的 `active_scope.json`；`prod` 会被拒绝。流程围绕读取全部用户数据、管理员权限和代码执行等 prize 展开，每个 prize 都要证明影响并重新验证，最后复核清理。
+
+四个门控的详细证明契约见[proof contract](docs/proof.md)，支持的命令和来源身份见[范围执行](docs/scoped-execution.md)。
+
+### 四个门控
+
+| 门控 | 事件 | 会拒绝 |
+|---|---|---|
+| **Evidence** | `Stop` | 没有本轮成功匹配检查和新鲜 artifact 指纹的 `VERDICT: PASS` |
+| **Citation** | `Stop` | 引用本会话未抓取 URL 的 `SOURCES: VERIFIED` |
+| **Findings** | `Stop` | 没有匹配预期结果和新鲜 artifact 指纹的 `FINDINGS: VERIFIED` |
+| **Scope** | `PreToolUse` | 没有有效范围、不支持目标或执行形式、超出声明范围、没有显式授权 URL 的攻击调用 |
+
+## 集成
+
+### 依赖和网络
 
 必需运行环境是支持插件的 ZCode 主机，以及 **PATH 中的 Node.js 22+**。agent frontmatter 将角色路由到 ZAI Coding Plan 模型 `account:zai-individual-coding-plan/GLM-5.3` 和 `account:zai-individual-coding-plan/GLM-5.3-Flash`，并使用各自声明的 effort。模型可用性、账户限制和服务商流量遵循 ZAI Coding Plan 与 ZCode 主机策略。Rust、Cargo 和编译器只用于开发；通用归档不需要它们。
 
@@ -89,7 +180,58 @@ Linux ARM64          https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-unkno
 
 命令要求研究时还可能使用 ZCode 提供的 WebFetch/WebSearch。这些请求、ZAI 模型调用、可选的 grep.app、可选的 npm 安装，以及配置后的 Semgrep/OSV 请求都属于外部网络活动。通用启动器本身不会在运行时下载二进制。
 
+### Hooks
+
+主机在 ZCode 启动时读取 hook 声明。安装或更新后必须完全退出并重新启动 ZCode，然后开始新会话，才能同时重新加载 MCP 声明和 hooks。
+
+| 事件和匹配器 | 作用 |
+|---|---|
+| `SessionStart`（`startup`、`clear`、`compact`） | 注入流水线原则 |
+| `PostToolUse`（`Bash`） | 记录已执行的证据 |
+| `PostToolUse`（web fetch/search 匹配器） | 记录已抓取的来源 |
+| `PreToolUse`（`Bash`） | 检查 scope 并开始 proof 捕获 |
+| `PreToolUse`（`Agent`、`Task`） | 记录委派 dispatch |
+| `Stop` | 在结论前应用 evidence、citation 和 finding 门控 |
+| `PostToolUseFailure`（`Bash`） | 记录失败命令证据 |
+
+如果官方打包器丢失执行位，启动器会对选中的 POSIX 二进制执行 `chmod +x`。它只改变本地文件权限，不会下载替代二进制。
+
+### MCP servers
+
+插件声明五个 MCP server，位于[`.zcode-plugin/plugin.json`](.zcode-plugin/plugin.json)。主机只在应用启动时读取 MCP 声明，所以安装或更新后必须重启 ZCode。
+
+| Server | 传输 | 用途 |
+|---|---|---|
+| `scope` | stdio（`node ${ZCODE_PLUGIN_ROOT}/bin/launch.mjs scope-mcp`） | 授权范围：`get_scope` 只读查询，`revoke` 立即撤销 |
+| `semgrep` | stdio（`semgrep mcp`） | 静态分析，需要 `semgrep` 二进制 |
+| `osv-scanner` | stdio（`osv-scanner experimental-mcp`） | 依赖 CVE 扫描，需要 `osv-scanner` 二进制 |
+| `grep` | HTTP（`https://mcp.grep.app`） | 公开仓库代码搜索 |
+| `codegraph` | stdio（外部 Node 包） | 本地代码索引，依赖安装见[分发指南](docs/distribution.md) |
+
+可选 server 不可用时不会阻止内置 scope server 和四个门控运行。Codegraph 需要 Node；第一方 hooks 和 scope 运行时不依赖它。
+
+## 角色和模型
+
+### 角色和路由
+
+17 个角色分成写入、评审、验证和 council：
+
+`builder`、`scaffold-writer`、`plan-writer`、`draft-writer` 负责产出；`explorer`、`council-explorer`、`vision` 只读；`scaffold-critic`、`plan-critic`、`reviewer`、`council-analyst`、`council-skeptic`、`council-strategist` 负责评审；`verifier`、`source-verifier`、`finding-verifier` 负责验证；`council-innovator` 负责创意扩展。
+
+### 修改路由
+
+每个角色的模型和思考级别都写在 `agents/*.md` frontmatter 中，例如：
+
+```yaml
+model: account:zai-individual-coding-plan/GLM-5.3
+thoughtLevel: max
+```
+
+完整路由依据见[路由文档](docs/routing.md)。禁止把 Coding Plan 中的别名当作模型多样性；模型选择以实际 frontmatter 为准。
+
 ## 文件和副作用
+
+### 安装包内容
 
 安装后的插件包含以下公开文件：
 
@@ -107,95 +249,7 @@ Linux ARM64          https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-unkno
 
 agent 工作可以通过 ZCode 的委派 scope 执行 shell 命令。主机会把命令显示在会话中，evidence/proof hooks 会记录结果。`/ohmy-security` 和 `/ohmy-redteam` 对识别出的攻击命令要求已授权的 test/dev scope；scope gate 会阻止不支持或超出范围的请求。授予目标前请阅读[范围执行说明](docs/scoped-execution.md)。
 
-## Hooks
-
-主机在 ZCode 启动时读取 hook 声明。安装或更新后必须完全退出并重新启动 ZCode，然后开始新会话，才能同时重新加载 MCP 声明和 hooks。
-
-| 事件和匹配器 | 作用 |
-|---|---|
-| `SessionStart`（`startup`、`clear`、`compact`） | 注入流水线原则 |
-| `PostToolUse`（`Bash`） | 记录已执行的证据 |
-| `PostToolUse`（web fetch/search 匹配器） | 记录已抓取的来源 |
-| `PreToolUse`（`Bash`） | 检查 scope 并开始 proof 捕获 |
-| `PreToolUse`（`Agent`、`Task`） | 记录委派 dispatch |
-| `Stop` | 在结论前应用 evidence、citation 和 finding 门控 |
-| `PostToolUseFailure`（`Bash`） | 记录失败命令证据 |
-
-如果官方打包器丢失执行位，启动器会对选中的 POSIX 二进制执行 `chmod +x`。它只改变本地文件权限，不会下载替代二进制。
-
-## 六个命令
-
-### `/ohmy-council`
-
-并行提交一个想法给五个盲评角色：可行性、风险、价值三个评审，以及创新和未探索领域两个创意角色。评审在阅读 briefing 前先写标准，聚合按三个评审中至少两个的多数票计算；少数意见保持原文。结果写入 `.oh-my-zcode/council/<run>/`。
-
-```text
-/ohmy-council  让玩家导出最佳对局的混剪
-```
-
-机制说明见[council 文档](docs/council.md)。
-
-### `/ohmy-plan`
-
-explorer 只读侦察真实代码，scaffold-writer 写入 `scaffold.md`，scaffold-critic 校验，plan-writer 写入 `plan.md`，plan-critic 再根据代码和原则检查。编排器不写入计划文件。计划执行前使用此命令；结果位于 `.oh-my-zcode/plans/<run>/`，可能标记为 `PLAN READY` 或带具体问题的阻塞状态。
-
-### `/ohmy-swarm`
-
-builder 实现，reviewer 在新上下文中评审，verifier 执行决定性命令；循环直到评审和验证签名齐全。结果是基于执行证据的 `VERDICT: PASS`。
-
-### `/ohmy-research`
-
-把问题拆成最多三个方向，并要求研究角色实际抓取页面；搜索摘要不算来源。draft-writer 写 `report.md`，source-verifier 逐条对照来源，最后在 `.oh-my-zcode/research/<run>/` 产生带 `SOURCES: VERIFIED` 的报告。
-
-### `/ohmy-security`
-
-先把范围写入 `scope.json`，再生成 `surface.md` 并按类别派发检查。scope gate 会阻止未授权的攻击命令；finding-verifier 会盲测复现每个候选发现。只有复现的发现进入报告，并以 `FINDINGS: VERIFIED` 标记。
-
-### `/ohmy-redteam`
-
-根据调用参数锁定目标和环境，写入有效期 60 分钟的 `active_scope.json`；`prod` 会被拒绝。流程围绕读取全部用户数据、管理员权限和代码执行等 prize 展开，每个 prize 都要证明影响并重新验证，最后复核清理。
-
-四个门控的详细证明契约见[proof contract](docs/proof.md)，支持的命令和来源身份见[范围执行](docs/scoped-execution.md)。
-
-## 四个门控：它们会阻止，不会询问
-
-| 门控 | 事件 | 会拒绝 |
-|---|---|---|
-| **Evidence** | `Stop` | 没有本轮成功匹配检查和新鲜 artifact 指纹的 `VERDICT: PASS` |
-| **Citation** | `Stop` | 引用本会话未抓取 URL 的 `SOURCES: VERIFIED` |
-| **Findings** | `Stop` | 没有匹配预期结果和新鲜 artifact 指纹的 `FINDINGS: VERIFIED` |
-| **Scope** | `PreToolUse` | 没有有效范围、不支持目标或执行形式、超出声明范围、没有显式授权 URL 的攻击调用 |
-
-## MCP servers
-
-插件声明五个 MCP server，位于[`.zcode-plugin/plugin.json`](.zcode-plugin/plugin.json)。主机只在应用启动时读取 MCP 声明，所以安装或更新后必须重启 ZCode。
-
-| Server | 传输 | 用途 |
-|---|---|---|
-| `scope` | stdio（`node ${ZCODE_PLUGIN_ROOT}/bin/launch.mjs scope-mcp`） | 授权范围：`get_scope` 只读查询，`revoke` 立即撤销 |
-| `semgrep` | stdio（`semgrep mcp`） | 静态分析，需要 `semgrep` 二进制 |
-| `osv-scanner` | stdio（`osv-scanner experimental-mcp`） | 依赖 CVE 扫描，需要 `osv-scanner` 二进制 |
-| `grep` | HTTP（`https://mcp.grep.app`） | 公开仓库代码搜索 |
-| `codegraph` | stdio（外部 Node 包） | 本地代码索引，依赖安装见[分发指南](docs/distribution.md) |
-
-可选 server 不可用时不会阻止内置 scope server 和四个门控运行。Codegraph 需要 Node；第一方 hooks 和 scope 运行时不依赖它。
-
-## 角色和模型
-
-17 个角色分成写入、评审、验证和 council：
-
-`builder`、`scaffold-writer`、`plan-writer`、`draft-writer` 负责产出；`explorer`、`council-explorer`、`vision` 只读；`scaffold-critic`、`plan-critic`、`reviewer`、`council-analyst`、`council-skeptic`、`council-strategist` 负责评审；`verifier`、`source-verifier`、`finding-verifier` 负责验证；`council-innovator` 负责创意扩展。
-
-每个角色的模型和思考级别都写在 `agents/*.md` frontmatter 中，例如：
-
-```yaml
-model: account:zai-individual-coding-plan/GLM-5.3
-thoughtLevel: max
-```
-
-完整路由依据见[路由文档](docs/routing.md)。禁止把 Coding Plan 中的别名当作模型多样性；模型选择以实际 frontmatter 为准。
-
-## 磁盘数据和开发
+### 运行数据
 
 ```text
 .oh-my-zcode/
@@ -209,6 +263,8 @@ thoughtLevel: max
     └── <run>/                      scope.json、surface.md、report.md、evidence.jsonl
 ```
 
+## 开发
+
 开发环境可在仓库根目录运行：
 
 ```bash
@@ -218,12 +274,14 @@ cargo run --locked -- validate plugin
 node test_gate.mjs
 ```
 
+### 版本策略
+
 这些命令需要 Rust；过程契约测试需要 Node。终端用户使用预编译归档。当前 3.0.0 版本以通用 marketplace 为主，并提供 5 个活跃的按平台原生包作为无 Node 替代方案。同一版本的修正需要完整重装且只保留一个副本。版本策略见[versioning](docs/versioning.md)。
 
 ## 卸载
 
 在 **Settings → Plugins → oh-my-zcode → uninstall** 卸载。项目中的 `.oh-my-zcode/` 运行数据会保留；重新安装或切换 marketplace 前先移除已有副本。
 
-## License
+## 许可证
 
 插件采用 [MIT License](LICENSE)。可选的 `@colbymchenry/codegraph` 1.5.0 的 MIT 元数据记录在锁文件中；其源代码仓库未在此归档中核验，参见上面的 npm registry 链接。Semgrep、OSV Scanner、grep.app、Node/npm 和 ZAI Coding Plan 遵循各自的条款。
