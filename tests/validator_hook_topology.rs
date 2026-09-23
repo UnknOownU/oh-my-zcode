@@ -22,7 +22,7 @@ fn copy_tree(source: &Path, destination: &Path) -> std::io::Result<()> {
     fs::create_dir_all(destination)?;
     for entry in fs::read_dir(source)? {
         let entry = entry?;
-        if ["node_modules", "bin", ".oh-my-zcode"]
+        if ["node_modules", ".oh-my-zcode"]
             .iter()
             .any(|skip| entry.file_name() == *skip)
         {

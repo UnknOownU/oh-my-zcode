@@ -5,10 +5,10 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
-      distribution_base_url:
-        description: HTTPS base URL for generated marketplaces; does not publish
-        required: false
-        default: https://example.invalid/oh-my-zcode/v3.0.0/
+      publish:
+        description: Publish the verified current version and deploy Pages
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -69,7 +69,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     env:
       OHMY_ZCODE_BIN: ${{ github.workspace }}/target/${{ matrix.target }}/release/${{ matrix.binary }}
-      DISTRIBUTION_BASE_URL: ${{ inputs.distribution_base_url || 'https://example.invalid/oh-my-zcode/v3.0.0/' }}
+      DISTRIBUTION_BASE_URL: https://unknoownu.github.io/oh-my-zcode/3.0.0/
       CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
     steps:
@@ -80,7 +80,7 @@ jobs:
           targets: ${{ matrix.target }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: 24
+          node-version: 22
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           key: ${{ matrix.target }}
@@ -91,6 +91,7 @@ jobs:
       - name: Native process contracts
         run: |
           node test_gate.mjs
+          node test_universal_launcher.mjs
           node --test test_proof_gate.mjs test_proof_gate_events.mjs test_proof_gate_policy.mjs test_proof_gate_adversarial.mjs test_native_protocol.mjs test_workspace_boundary.mjs test_hook_security.mjs
       - name: Build immutable platform package
         run: cargo run --locked -p xtask -- package --target "${{ matrix.target }}" --binary "$OHMY_ZCODE_BIN" --output dist --base-url "$DISTRIBUTION_BASE_URL"
@@ -98,6 +99,182 @@ jobs:
         run: cargo run --locked -p xtask -- smoke --target "${{ matrix.target }}" --archive "dist/${{ matrix.target }}/plugins/oh-my-zcode/3.0.0/plugin.zip"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: oh-my-zcode-3.0.0-${{ matrix.target }}
+          name: distribution-${{ matrix.target }}
           path: dist/${{ matrix.target }}/
           if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: runtime-${{ matrix.target }}
+          path: ${{ env.OHMY_ZCODE_BIN }}
+          if-no-files-found: error
+
+  universal:
+    needs: package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: 1.96.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: runtime-*
+          path: binaries
+      - run: |
+          for path in binaries/runtime-*; do mv "$path" "binaries/${path##*/runtime-}"; done
+          cargo run --locked -p xtask -- universal --binaries binaries --output dist --base-url https://unknoownu.github.io/oh-my-zcode/3.0.0/
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: distribution-universal
+          path: dist/universal/
+          if-no-files-found: error
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: zai-org/zcode-plugins
+          ref: cf739288297533abaa5eec9561bd1cb96e328532
+          path: official
+      - name: Build the actual official marketplace archive
+        run: |
+          python3 -m zipfile -e dist/universal/plugins/oh-my-zcode/3.0.0/plugin.zip official/plugins
+          node --input-type=module <<'JS'
+          import {readFileSync, writeFileSync} from 'node:fs';
+          const path = 'official/marketplace.json';
+          const market = JSON.parse(readFileSync(path, 'utf8'));
+          const entry = JSON.parse(readFileSync('marketplace.json', 'utf8')).plugins[0];
+          market.plugins.push({...entry, source: './plugins/oh-my-zcode'});
+          writeFileSync(path, JSON.stringify(market, null, 2) + '\n');
+          JS
+          python3 official/scripts/validate.py
+          python3 official/scripts/build_dist.py
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: official-universal
+          path: official/dist/plugins/oh-my-zcode/3.0.0/plugin.zip
+          if-no-files-found: error
+
+  universal-smoke:
+    needs: universal
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: 1.96.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: distribution-universal
+          path: universal
+      - run: cargo run --locked -p xtask -- smoke --universal --target "${{ matrix.target }}" --archive universal/plugins/oh-my-zcode/3.0.0/plugin.zip
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: official-universal
+          path: official-archive
+      - name: Exercise official ZIP with extractor permissions removed
+        run: cargo run --locked -p xtask -- smoke --universal --target "${{ matrix.target }}" --archive official-archive/plugin.zip
+
+  publication-check:
+    needs: [package, universal]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: distribution-*
+          path: distributions
+      - name: Test publication boundaries
+        run: |
+          uv run --project scripts --locked python scripts/test_publish_pages.py
+          uv run --project scripts --locked python scripts/test_publish_pages_negative.py
+      - name: Build portable release assets and exact Pages tree
+        run: |
+          for path in distributions/distribution-*; do
+            kind="${path##*/distribution-}"
+            uv run --project scripts --locked python scripts/publish_pages.py bundle --source "$path" --version 3.0.0 --kind "$kind" --base-url https://unknoownu.github.io/oh-my-zcode/ --output "releases/v3.0.0/oh-my-zcode-3.0.0-$kind.zip"
+          done
+          uv run --project scripts --locked python scripts/publish_pages.py assemble --releases releases --output site --base-url https://unknoownu.github.io/oh-my-zcode/
+          node --input-type=module <<'JS'
+          import {readFileSync, readdirSync, writeFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const root = 'releases/v3.0.0';
+          const sha256 = Object.fromEntries(readdirSync(root).sort().map(name =>
+            [name, createHash('sha256').update(readFileSync(`${root}/${name}`)).digest('hex')]));
+          const record = {version: '3.0.0', sourceCommit: process.env.GITHUB_SHA,
+            workflowRun: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`, sha256};
+          writeFileSync(`${root}/oh-my-zcode-3.0.0-build.json`, JSON.stringify(record, null, 2) + '\n');
+          JS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: release-assets
+          path: releases/v3.0.0/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: marketplace-site
+          path: site/
+          if-no-files-found: error
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+    needs: [quality, package, universal-smoke, publication-check]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: release-assets
+          path: release-assets
+      - name: Publish verified v3.0.0 distribution assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload v3.0.0 release-assets/* --clobber
+          obsolete=$(gh release view v3.0.0 --json assets --jq '.assets[] | select(.name == "oh-my-zcode-3.0.0-windows-marketplace.zip") | .name')
+          if [[ -n "$obsolete" ]]; then gh release delete-asset v3.0.0 "$obsolete" --yes; fi
+          dispatch_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          gh workflow run pages.yml --ref main
+          run_id=''
+          for _ in {1..30}; do
+            while IFS=$'\t' read -r candidate created_at; do
+              if [[ "$created_at" > "$dispatch_started" || "$created_at" == "$dispatch_started" ]]; then
+                run_id="$candidate"
+                break
+              fi
+            done < <(gh run list --workflow pages.yml --branch main --event workflow_dispatch --limit 10 --json databaseId,createdAt --jq '.[] | [.databaseId, .createdAt] | @tsv')
+            if [[ -n "$run_id" ]]; then break; fi
+            sleep 2
+          done
+          if [[ -z "$run_id" ]]; then
+            echo 'Pages workflow did not start after dispatch' >&2
+            exit 1
+          fi
+          gh run watch "$run_id" --exit-status
+          for _ in {1..10}; do
+            if uv run --project scripts --locked python scripts/verify_published.py --base-url https://unknoownu.github.io/oh-my-zcode/ --version 3.0.0; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'Public Pages verification did not converge' >&2
+          exit 1

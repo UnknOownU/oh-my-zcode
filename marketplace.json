@@ -1,6 +1,6 @@
 {
   "name": "unknoownu",
-  "description": "BetterZcode - plugins that make ZCode prove its work instead of claiming it.",
+  "description": "Oh My Zcode - plugins that make ZCode prove its work instead of claiming it.",
   "owner": {
     "name": "UnknOownU",
     "url": "https://github.com/UnknOownU"
@@ -11,7 +11,7 @@
       "source": "./plugin",
       "description": "Evidence-gated ZCode pipeline: separate builders, reviewers and verifiers; PASS requires a matched execution result and unchanged source/artifact fingerprints. Research checks fetched citations; security checks scoped execution and explicit reproduction contracts.",
       "version": "3.0.0",
-      "category": "Developer Tools",
+      "category": "developer-tools",
       "tags": [
         "code-review",
         "qa",
@@ -24,7 +24,11 @@
         "pentest",
         "red-team",
         "impact"
-      ]
+      ],
+      "description_i18n": {
+        "en": "Evidence-gated ZCode pipeline: separate builders, reviewers and verifiers; PASS requires a matched execution result and unchanged source/artifact fingerprints. Research checks fetched citations; security checks scoped execution and explicit reproduction contracts.",
+        "zh-CN": "证据门控的 ZCode 流水线：构建者、审查者和验证者相互独立；只有执行结果匹配且源代码与产物指纹未变化时才会通过。研究流程核验引用来源，安全流程核验执行范围和明确的复现约定。"
+      }
     }
   ]
 }

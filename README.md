@@ -6,19 +6,33 @@
 
 The home of **BetterZcode** — an evidence-gated pipeline plugin for ZCode:
 
-- **16 sealed agents** that explore, write, review, verify and sit on a blind council — no agent ever judges its own work, and the orchestrator never holds the pen
+- **17 sealed agents** that explore, write, review, verify and sit on a blind council — no agent ever judges its own work, and the orchestrator never holds the pen
 - **6 commands** — `/ohmy-council`, `/ohmy-plan`, `/ohmy-swarm`, `/ohmy-research`, `/ohmy-security`, `/ohmy-redteam`
 - **4 mechanical gates** — hooks that block a success verdict no executed test supports, a report citing a page never fetched, a security finding never reproduced, and attack commands fired without an authorized test/dev scope
 
-**This repository builds the Oh My Zcode plugin.** The plugin assets live in [`plugin/`](plugin/README.md); the first-party runtime is Rust. Version **3.0.0** is distributed as precompiled platform packages.
+**This repository builds the Oh My Zcode plugin.** The plugin assets live in [`plugin/`](plugin/README.md). Version **3.0.0** ships one native package per platform — no Node.js, compiler, or npm install required. A universal package with a single marketplace URL publishes with the next release.
 
 ## Install
 
-1. Choose the precompiled package for Windows x64, macOS Intel/Apple Silicon, or Linux x64/ARM64.
-2. ZCode → **Settings → Plugins → Create → Add marketplace**, then add that platform's published marketplace URL.
-3. Install **`oh-my-zcode`**, restart ZCode, and start a **new session**.
+1. If another copy is installed, uninstall it in **Settings → Plugins** first. Keep only one installation of `oh-my-zcode`.
+2. In **Settings → Plugins → Create → Add marketplace**, paste the JSON URL for your machine:
 
-Rust and Node are not required by the bundled hooks or scope server. Codegraph is an optional external server that requires Node. See [installation and platform selection](plugin/docs/distribution.md). The repository checkout is for development; release artifacts must be published before their marketplace URLs can be used.
+   | Machine | Marketplace JSON URL |
+   |---|---|
+   | Windows x64 | `https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-pc-windows-msvc/marketplace.json` |
+   | macOS Apple Silicon (M1–M4) | `https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-apple-darwin/marketplace.json` |
+   | macOS Intel | `https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-apple-darwin/marketplace.json` |
+   | Linux x64 | `https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-unknown-linux-musl/marketplace.json` |
+   | Linux ARM64 | `https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-unknown-linux-musl/marketplace.json` |
+
+   On a Mac, **Apple menu → About This Mac** tells the chip: Apple M1–M4 is Apple Silicon; an Intel processor listing is Intel.
+3. Open the added marketplace, install **`oh-my-zcode`**, quit ZCode completely, relaunch, and start a **new session**. On Windows, quit from the tray if the app remains running; on macOS, use **ZCode → Quit ZCode** or **⌘Q**.
+
+The [installation guide](plugin/docs/distribution.md) covers the same URLs, manual ZIP installs, and updates. A ZIP download URL and the HTML download page are **not marketplace inputs**.
+
+## Update
+
+This correction remains **3.0.0**: uninstall an existing copy and install the corrected package from the JSON URL above. An equal version does not trigger a version-based update. For future releases, refresh the marketplace in ZCode's Plugins settings and install the offered update. Fully quit and relaunch ZCode, then open a new session. The session-start notice **only announces updates**; it does not install them. See [updates and reinstalling](plugin/docs/distribution.md#updates-and-reinstalling).
 
 ## What's in here
 
@@ -42,4 +56,4 @@ The 1.x line closed; the **2.x MCP era shipped 2026-08-21** — 5 MCP servers (s
 
 ---
 
-MIT · Private repository.
+MIT · Public source repository.

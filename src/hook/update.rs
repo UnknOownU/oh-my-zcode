@@ -14,8 +14,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const DEFAULT_MARKETPLACE_URL: &str =
-    "https://raw.githubusercontent.com/UnknOownU/oh-my-zcode/main/marketplace.json";
+const DEFAULT_MARKETPLACE_URL: &str = "https://unknoownu.github.io/oh-my-zcode/marketplace.json";
 const CURL_TIMEOUT_SECS: &str = "2";
 const RETRY_EVERY_MS: u64 = 24 * 60 * 60 * 1000;
 
@@ -64,7 +63,7 @@ pub(super) fn notice() -> Option<String> {
     }
     Some(format!(
         "UPDATE oh-my-zcode: {latest} available (installed {installed}) — \
-         update via Settings > Plugins or `zcode plugins update oh-my-zcode@unknoownu`."
+         update via Settings > Plugins."
     ))
 }
 
@@ -220,5 +219,13 @@ mod tests {
         assert_eq!(state.last_attempt_ms, 123);
         assert_eq!(state.latest.as_deref(), Some("3.1.0"));
         assert!(!state.disabled);
+    }
+
+    #[test]
+    fn default_marketplace_url_is_the_official_universal_feed() {
+        assert_eq!(
+            DEFAULT_MARKETPLACE_URL,
+            "https://unknoownu.github.io/oh-my-zcode/marketplace.json"
+        );
     }
 }

@@ -56,8 +56,10 @@ test('proof hooks are registered synchronously on the actual host events', async
   for (const [event, handler] of [['PreToolUse', 'proof_start'], ['PostToolUse', 'evidence'], ['PostToolUseFailure', 'evidence_failure']]) {
     const configured = hooks[event].flatMap(group => group.matcher === 'Bash' ? group.hooks : []);
     assert.ok(configured.some(hook => hook.type === 'process'
-      && /\/bin\/oh-my-zcode(?:\.exe)?$/.test(hook.command)
-      && JSON.stringify(hook.args) === JSON.stringify(['hook', handler]) && !hook.async));
+      && hook.command === 'node'
+      && JSON.stringify(hook.args) === JSON.stringify([
+        '${ZCODE_PLUGIN_ROOT}/bin/launch.mjs', 'hook', handler,
+      ]) && !hook.async));
   }
 });
 

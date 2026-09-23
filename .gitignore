@@ -3,6 +3,7 @@ node_modules/
 .config/
 /target/
 /dist/
+/scripts/__pycache__/
 
 /.omo/
 

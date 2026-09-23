@@ -7,6 +7,7 @@ mod package;
 mod smoke;
 mod smoke_protocol;
 mod target;
+mod universal;
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
@@ -22,12 +23,15 @@ struct Cli {
 enum Command {
     /// Create one immutable platform distribution.
     Package(package::Options),
+    Universal(universal::Options),
     #[command(about = "Extract and exercise the exact packaged runtime")]
     Smoke {
         #[arg(long)]
         archive: PathBuf,
         #[arg(long, value_enum)]
         target: target::Target,
+        #[arg(long)]
+        universal: bool,
     },
     /// Check AST-based Rust complexity and module size.
     Quality {
@@ -41,7 +45,12 @@ enum Command {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     match Cli::parse().command {
         Command::Package(options) => package::run(&options)?,
-        Command::Smoke { archive, target } => smoke::run(&archive, target)?,
+        Command::Universal(options) => universal::run(&options)?,
+        Command::Smoke {
+            archive,
+            target,
+            universal,
+        } => smoke::run(&archive, target, universal)?,
         Command::Quality { analyzer, root } => metrics::check(&root, &analyzer)?,
     }
     Ok(())

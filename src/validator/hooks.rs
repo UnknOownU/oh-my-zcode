@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, path::Path};
 
 use serde::Deserialize;
 
-use super::{ValidationReport, files};
+use super::{ValidationReport, files, runtime};
 
 #[derive(Debug, Deserialize)]
 struct Hooks {
@@ -95,11 +95,16 @@ const REQUIRED: &[Binding] = &[
     },
 ];
 
-pub(super) fn check(root: &Path, packaged: bool, report: &mut ValidationReport) {
+pub(super) fn check(
+    root: &Path,
+    packaged: bool,
+    selected: Option<runtime::Runtime>,
+    report: &mut ValidationReport,
+) {
     let Some(document) = files::json::<Hooks>(&root.join("hooks/hooks.json"), report) else {
         return;
     };
-    check_topology(&document, report);
+    check_topology(&document, selected, report);
     for (event, groups) in &document.hooks {
         report.check(
             EVENTS.contains(&event.as_str()),
@@ -116,7 +121,11 @@ pub(super) fn check(root: &Path, packaged: bool, report: &mut ValidationReport) 
     }
 }
 
-fn check_topology(document: &Hooks, report: &mut ValidationReport) {
+fn check_topology(
+    document: &Hooks,
+    selected: Option<runtime::Runtime>,
+    report: &mut ValidationReport,
+) {
     let count: usize = document.hooks.values().map(Vec::len).sum();
     report.check(
         count == REQUIRED.len(),
@@ -137,14 +146,19 @@ fn check_topology(document: &Hooks, report: &mut ValidationReport) {
                         .hooks
                         .iter()
                         .zip(binding.handlers)
-                        .all(|(hook, handler)| hook.args.as_slice() == ["hook", *handler])
+                        .all(|(hook, handler)| {
+                            let invocation =
+                                runtime::parse(&hook.command, &hook.args, &["hook", *handler]);
+                            invocation.is_some()
+                                && selected.is_none_or(|expected| invocation == Some(expected))
+                        })
             }
             _ => false,
         };
         report.check(
             valid,
             format!(
-                "hooks.json: {} matcher {:?} must register {:?} exactly once in order",
+                "hooks.json: {} matcher {:?} must register {:?} exactly once in order using the manifest runtime",
                 binding.event, binding.matcher, binding.handlers
             ),
         );
@@ -155,10 +169,6 @@ fn check_hook(event: &str, hook: &Hook, report: &mut ValidationReport) {
     report.check(
         !hook.asynchronous || !SYNCHRONOUS.contains(&event),
         format!("{event}: async gating hooks cannot inject context or block"),
-    );
-    report.check(
-        files::native_command(&hook.command),
-        format!("{event}: native plugin command required"),
     );
     if hook.timeout_ms.is_none_or(|timeout| timeout == 0) {
         report

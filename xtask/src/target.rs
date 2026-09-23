@@ -15,6 +15,14 @@ pub(crate) enum Target {
 }
 
 impl Target {
+    pub(crate) const ALL: [Self; 5] = [
+        Self::WindowsX64,
+        Self::MacosX64,
+        Self::MacosArm64,
+        Self::LinuxX64,
+        Self::LinuxArm64,
+    ];
+
     pub(crate) const fn triple(self) -> &'static str {
         match self {
             Self::WindowsX64 => "x86_64-pc-windows-msvc",

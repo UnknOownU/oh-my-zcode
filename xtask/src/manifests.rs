@@ -6,12 +6,15 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, path::Path};
 
+const LAUNCHER: &str = "${ZCODE_PLUGIN_ROOT}/bin/launch.mjs";
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Plugin {
     pub(crate) name: String,
     pub(crate) version: String,
     pub(crate) description: String,
+    description_i18n: BTreeMap<String, String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     author: Option<Author>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -72,22 +75,13 @@ struct Hook {
 }
 
 pub(crate) fn bake(root: &Path, target: Target) -> Result<(Plugin, Vec<Entry>)> {
-    let mut plugin: Plugin = read_json(&root.join(".zcode-plugin/plugin.json"))?;
-    if plugin.name != "oh-my-zcode" || plugin.version != env!("CARGO_PKG_VERSION") {
-        return Err(Error::Manifest(
-            "plugin name/version must match the package builder",
-        ));
-    }
+    let (mut plugin, mut hooks) = read_manifests(root)?;
+    validate_scope(&plugin)?;
     let Some(Server::Stdio { command, args }) = plugin.servers.get_mut("scope") else {
         return Err(Error::Manifest("scope must be a stdio server"));
     };
-    if args != &["scope-mcp"] {
-        return Err(Error::Manifest(
-            "scope must invoke the native scope-mcp command",
-        ));
-    }
     *command = target.command();
-    let mut hooks: Hooks = read_json(&root.join("hooks/hooks.json"))?;
+    args.remove(0);
     for hook in hooks
         .hooks
         .values_mut()
@@ -96,25 +90,80 @@ pub(crate) fn bake(root: &Path, target: Target) -> Result<(Plugin, Vec<Entry>)> 
     {
         bake_hook(hook, target)?;
     }
-    let entries = vec![
+    let entries = manifest_entries(&plugin, &hooks)?;
+    Ok((plugin, entries))
+}
+
+pub(crate) fn universal(root: &Path) -> Result<(Plugin, Vec<Entry>)> {
+    let (plugin, hooks) = read_manifests(root)?;
+    validate_scope(&plugin)?;
+    for hook in hooks
+        .hooks
+        .values()
+        .flatten()
+        .flat_map(|group| &group.hooks)
+    {
+        validate_hook(hook)?;
+    }
+    let entries = manifest_entries(&plugin, &hooks)?;
+    Ok((plugin, entries))
+}
+
+fn read_manifests(root: &Path) -> Result<(Plugin, Hooks)> {
+    let plugin: Plugin = read_json(&root.join(".zcode-plugin/plugin.json"))?;
+    if plugin.name != "oh-my-zcode" || plugin.version != env!("CARGO_PKG_VERSION") {
+        return Err(Error::Manifest(
+            "plugin name/version must match the package builder",
+        ));
+    }
+    let locales = plugin.description_i18n.keys().map(String::as_str);
+    if !locales.eq(["en", "zh-CN"]) {
+        return Err(Error::Manifest(
+            "description_i18n must contain exactly en and zh-CN",
+        ));
+    }
+    let hooks = read_json(&root.join("hooks/hooks.json"))?;
+    Ok((plugin, hooks))
+}
+
+fn manifest_entries(plugin: &Plugin, hooks: &Hooks) -> Result<Vec<Entry>> {
+    Ok(vec![
         Entry::new(
             Path::new(".zcode-plugin/plugin.json"),
-            serde_json::to_vec_pretty(&plugin)?,
+            serde_json::to_vec_pretty(plugin)?,
             false,
         )?,
         Entry::new(
             Path::new("hooks/hooks.json"),
-            serde_json::to_vec_pretty(&hooks)?,
+            serde_json::to_vec_pretty(hooks)?,
             false,
         )?,
-    ];
-    Ok((plugin, entries))
+    ])
+}
+
+fn validate_scope(plugin: &Plugin) -> Result<()> {
+    let Some(Server::Stdio { command, args }) = plugin.servers.get("scope") else {
+        return Err(Error::Manifest("scope must be a stdio server"));
+    };
+    if command != "node" || args.iter().map(String::as_str).ne([LAUNCHER, "scope-mcp"]) {
+        return Err(Error::Manifest(
+            "scope must invoke scope-mcp through the bundled launcher",
+        ));
+    }
+    Ok(())
 }
 
 fn bake_hook(hook: &mut Hook, target: Target) -> Result<()> {
-    let [command, event] = hook.args.as_slice() else {
+    validate_hook(hook)?;
+    hook.command = target.command();
+    hook.args.remove(0);
+    Ok(())
+}
+
+fn validate_hook(hook: &Hook) -> Result<()> {
+    let [launcher, command, event] = hook.args.as_slice() else {
         return Err(Error::Manifest(
-            "each native hook requires [hook, event] arguments",
+            "each native hook requires [launcher, hook, event] arguments",
         ));
     };
     let valid_event = matches!(
@@ -128,10 +177,14 @@ fn bake_hook(hook: &mut Hook, target: Target) -> Result<()> {
             | "dispatch"
             | "stop"
     );
-    if hook.kind != "process" || command != "hook" || !valid_event {
-        return Err(Error::Manifest("unsupported native hook invocation"));
+    if hook.kind != "process"
+        || hook.command != "node"
+        || launcher != LAUNCHER
+        || command != "hook"
+        || !valid_event
+    {
+        return Err(Error::Manifest("unsupported launcher hook invocation"));
     }
-    hook.command = target.command();
     Ok(())
 }
 

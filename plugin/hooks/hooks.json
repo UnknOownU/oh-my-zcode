@@ -7,8 +7,9 @@
         "hooks": [
           {
             "type": "process",
-            "command": "${ZCODE_PLUGIN_ROOT}/bin/oh-my-zcode",
+            "command": "node",
             "args": [
+              "${ZCODE_PLUGIN_ROOT}/bin/launch.mjs",
               "hook",
               "session_start"
             ],
@@ -23,8 +24,9 @@
         "hooks": [
           {
             "type": "process",
-            "command": "${ZCODE_PLUGIN_ROOT}/bin/oh-my-zcode",
+            "command": "node",
             "args": [
+              "${ZCODE_PLUGIN_ROOT}/bin/launch.mjs",
               "hook",
               "evidence"
             ],
@@ -37,8 +39,9 @@
         "hooks": [
           {
             "type": "process",
-            "command": "${ZCODE_PLUGIN_ROOT}/bin/oh-my-zcode",
+            "command": "node",
             "args": [
+              "${ZCODE_PLUGIN_ROOT}/bin/launch.mjs",
               "hook",
               "sources"
             ],
@@ -53,8 +56,9 @@
         "hooks": [
           {
             "type": "process",
-            "command": "${ZCODE_PLUGIN_ROOT}/bin/oh-my-zcode",
+            "command": "node",
             "args": [
+              "${ZCODE_PLUGIN_ROOT}/bin/launch.mjs",
               "hook",
               "scope"
             ],
@@ -62,8 +66,9 @@
           },
           {
             "type": "process",
-            "command": "${ZCODE_PLUGIN_ROOT}/bin/oh-my-zcode",
+            "command": "node",
             "args": [
+              "${ZCODE_PLUGIN_ROOT}/bin/launch.mjs",
               "hook",
               "proof_start"
             ],
@@ -76,8 +81,9 @@
         "hooks": [
           {
             "type": "process",
-            "command": "${ZCODE_PLUGIN_ROOT}/bin/oh-my-zcode",
+            "command": "node",
             "args": [
+              "${ZCODE_PLUGIN_ROOT}/bin/launch.mjs",
               "hook",
               "dispatch"
             ],
@@ -91,8 +97,9 @@
         "hooks": [
           {
             "type": "process",
-            "command": "${ZCODE_PLUGIN_ROOT}/bin/oh-my-zcode",
+            "command": "node",
             "args": [
+              "${ZCODE_PLUGIN_ROOT}/bin/launch.mjs",
               "hook",
               "stop"
             ],
@@ -107,8 +114,9 @@
         "hooks": [
           {
             "type": "process",
-            "command": "${ZCODE_PLUGIN_ROOT}/bin/oh-my-zcode",
+            "command": "node",
             "args": [
+              "${ZCODE_PLUGIN_ROOT}/bin/launch.mjs",
               "hook",
               "evidence_failure"
             ],

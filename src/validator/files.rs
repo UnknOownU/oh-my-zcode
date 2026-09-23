@@ -126,6 +126,17 @@ pub(super) fn reference(root: &Path, target: &str, report: &mut ValidationReport
     }
 }
 
+pub(super) fn required_file(root: &Path, relative: &str, report: &mut ValidationReport) {
+    let resolved = root.join(relative);
+    if resolved.is_file() {
+        check_containment(root, &resolved, report);
+    } else {
+        report
+            .errors
+            .push(format!("universal runtime payload missing: {relative}"));
+    }
+}
+
 fn check_containment(root: &Path, target: &Path, report: &mut ValidationReport) {
     let result = fs::canonicalize(root)
         .and_then(|root| fs::canonicalize(target).map(|target| target.starts_with(root)))
