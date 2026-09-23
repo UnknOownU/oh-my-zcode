@@ -1,44 +1,30 @@
 # Distribution and installation
 
-## Recommended: one marketplace for every supported machine
+## Recommended: the native marketplace for your machine
 
-The **3.0.0 universal package** contains five precompiled Rust executables. A small launcher selects the one for your machine. Install **Node.js 22 or newer** and check `node --version`; ZCode must be able to find `node` on its `PATH`. No Rust toolchain, compiler, or npm install is needed for the hooks and scope server.
-
-Paste this exact URL in **ZCode → Settings → Plugins → Create → Add marketplace**:
-
-```text
-https://unknoownu.github.io/oh-my-zcode/marketplace.json
-```
-
-Open the added marketplace, install **oh-my-zcode**, completely quit and relaunch ZCode, then start a **new session**. On macOS, use **ZCode → Quit ZCode** or **⌘Q**. On Windows, quit from the tray menu if closing the window leaves the app running. Reopen ZCode after installing Node so it receives the updated `PATH`.
-
-If another copy is present, follow [updates and reinstalling](#updates-and-reinstalling) first. Installing from two marketplaces can create two copies.
-
-The [download page](https://unknoownu.github.io/oh-my-zcode/) is a page for people. **Add marketplace needs a URL ending in `marketplace.json`**, not that HTML page, a directory URL, a GitHub release page, or a ZIP URL. An error starting with `Unexpected token '<'` means the supplied URL returned HTML instead of JSON.
-
-| Machine | Target |
-|---|---|
-| Windows x64 | `x86_64-pc-windows-msvc` |
-| macOS Intel | `x86_64-apple-darwin` |
-| macOS Apple Silicon | `aarch64-apple-darwin` |
-| Linux x64 | `x86_64-unknown-linux-musl` |
-| Linux ARM64 | `aarch64-unknown-linux-musl` |
-
-Other operating systems and architectures, including native Windows ARM64, are not supported. On a Mac, **Apple menu → About This Mac** identifies the chip. The universal launcher selects the architecture of the running Node process; use native Node to run natively on Apple Silicon.
-
-## Alternative: native packages without Node
-
-These packages call Rust directly. Node is not required for their hooks or scope server. Choose **one** marketplace matching the machine that runs the plugin:
+Version **3.0.0** publishes one marketplace per platform. Each package runs the Rust binary directly — **no Node.js, compiler, or npm install is required** for the hooks and the scope server. In **ZCode → Settings → Plugins → Create → Add marketplace**, paste the JSON URL matching the machine that runs ZCode — choose exactly one:
 
 | Machine | Marketplace JSON URL |
 |---|---|
-| Windows x64 | <https://unknoownu.github.io/oh-my-zcode/latest/x86_64-pc-windows-msvc/marketplace.json> |
-| macOS Apple Silicon | <https://unknoownu.github.io/oh-my-zcode/latest/aarch64-apple-darwin/marketplace.json> |
-| macOS Intel | <https://unknoownu.github.io/oh-my-zcode/latest/x86_64-apple-darwin/marketplace.json> |
-| Linux x64 | <https://unknoownu.github.io/oh-my-zcode/latest/x86_64-unknown-linux-musl/marketplace.json> |
-| Linux ARM64 | <https://unknoownu.github.io/oh-my-zcode/latest/aarch64-unknown-linux-musl/marketplace.json> |
+| Windows x64 | <https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-pc-windows-msvc/marketplace.json> |
+| macOS Apple Silicon (M1–M4) | <https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-apple-darwin/marketplace.json> |
+| macOS Intel | <https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-apple-darwin/marketplace.json> |
+| Linux x64 | <https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-unknown-linux-musl/marketplace.json> |
+| Linux ARM64 | <https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-unknown-linux-musl/marketplace.json> |
 
-Their marketplace names are `oh-my-zcode-<target>`; the universal marketplace is `unknoownu`. These identities matter when removing a duplicate. Use the stable URLs above for installation and future updates.
+On a Mac, **Apple menu → About This Mac** identifies the chip: an "Apple M1/M2/M3/M4" chip is Apple Silicon (row 2); a listing like "Intel Core…" is Intel (row 3). Other operating systems and architectures, including native Windows ARM64, are not supported.
+
+Open the added marketplace, install **oh-my-zcode**, completely quit and relaunch ZCode, then start a **new session**. On macOS, use **ZCode → Quit ZCode** or **⌘Q**. On Windows, quit from the tray menu if closing the window leaves the app running.
+
+If another copy is present, follow [updates and reinstalling](#updates-and-reinstalling) first. Installing from two marketplaces can create two copies. These marketplaces are named `oh-my-zcode-<target>`; the future universal marketplace is named `unknoownu`. These identities matter when removing a duplicate.
+
+The [download page](https://unknoownu.github.io/oh-my-zcode/) is a page for people. **Add marketplace needs a URL ending in `marketplace.json`**, not that HTML page, a directory URL, a GitHub release page, or a ZIP URL. An error starting with `Unexpected token '<'` means the supplied URL returned HTML instead of JSON.
+
+## The universal package — one URL for every machine, from the next release
+
+The universal package bundles five precompiled Rust executables behind a small launcher that selects the one for the running machine. It requires **Node.js 22 or newer** on `PATH` (`node --version`); no Rust toolchain or npm install is needed. It publishes with the **next release**, when it becomes the recommended install and adds the single marketplace URL `https://unknoownu.github.io/oh-my-zcode/marketplace.json` — which does not resolve today.
+
+That URL and the stable `https://unknoownu.github.io/oh-my-zcode/latest/<target>/marketplace.json` aliases do **not** resolve on the published site today — use the versioned native URLs in the table above now. The universal launcher selects the architecture of the running Node process; use native Node to run natively on Apple Silicon.
 
 ## Manual installation and ZIP recovery
 
@@ -103,7 +89,7 @@ An unavailable optional server does not prevent the bundled gates or scope serve
 
 ## Update notice
 
-At session start the native binary compares the installed version against the [published marketplace](https://unknoownu.github.io/oh-my-zcode/marketplace.json): one anonymous GET, two-second timeout, `curl` on PATH, no project files, payload, or identifier. A newer version adds `UPDATE oh-my-zcode: <latest> available (installed <v>)` to the doctrine. Offline access, missing curl, or an invalid response does not prevent session startup.
+At session start the native binary compares the installed version against the [published marketplace](https://unknoownu.github.io/oh-my-zcode/marketplace.json) (that endpoint activates with the next release; today the request fails open and startup is unaffected): one anonymous GET, two-second timeout, `curl` on PATH, no project files, payload, or identifier. A newer version adds `UPDATE oh-my-zcode: <latest> available (installed <v>)` to the doctrine. Offline access, missing curl, or an invalid response does not prevent session startup.
 
 The check writes its state to `~/.zcode/cli/plugins/data/oh-my-zcode@unknoownu/update-check.json` and runs at most once per 24 hours. Set `"disabled": true` in that JSON file to disable it. `OH_MY_ZCODE_UPDATE_URL` and `OH_MY_ZCODE_UPDATE_STATE` are test/configuration overrides. The universal launcher sets `ZCODE_PLUGIN_ROOT` to the actual installed root before starting the nested Rust executable.
 
