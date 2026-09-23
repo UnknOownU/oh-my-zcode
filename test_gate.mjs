@@ -14,6 +14,9 @@ import { fileURLToPath } from "node:url";
 import { BINARY } from "./test_proof_gate_helpers.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+const PLUGIN_VERSION = JSON.parse(
+  readFileSync(join(HERE, "plugin", ".zcode-plugin", "plugin.json"), "utf8"),
+).version;
 
 const WS = mkdtempSync(join(tmpdir(), "gate-"));
 // A real workspace has a project marker; the hook anchors its log to it.
@@ -1064,7 +1067,7 @@ const hs = rpc([
 ], { cwd: SRV });
 check("26.1 initialize handshake answers with serverInfo",
   hs.get(1)?.result?.serverInfo?.name === "oh-my-zcode-scope"
-  && hs.get(1)?.result?.serverInfo?.version === "3.0.0",
+  && hs.get(1)?.result?.serverInfo?.version === PLUGIN_VERSION,
   JSON.stringify(hs.get(1)?.result?.serverInfo));
 const listedTools = hs.get(2)?.result?.tools ?? [];
 check("26.2 tools/list = exactly get_scope + revoke (no authorize tool)",
@@ -1264,8 +1267,11 @@ deleteScope();
     statePath,
     JSON.stringify({ last_attempt_ms: Date.now(), latest: "3.1.0" }),
   );
+  const updateNotice = spawnStart();
   check("27.1 newer cached version -> UPDATE notice appended to doctrine",
-    spawnStart().includes("UPDATE oh-my-zcode: 3.1.0 available (installed 0.9.0)"));
+    updateNotice.includes("UPDATE oh-my-zcode: 3.1.0 available (installed 0.9.0)"));
+  check("27.1 update notice points to Settings > Plugins without a marketplace id",
+    updateNotice.includes("Settings > Plugins") && !updateNotice.includes("@unknoownu"));
   writeFileSync(
     statePath,
     JSON.stringify({ last_attempt_ms: Date.now(), latest: "0.9.0" }),

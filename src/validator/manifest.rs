@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, path::Path};
 
 use serde::{Deserialize, de::IgnoredAny};
 
-use super::{ValidationReport, files, marketplace};
+use super::{ValidationReport, files, marketplace, runtime};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,15 +30,16 @@ enum Server {
     },
 }
 
-pub(super) fn check(root: &Path, packaged: bool, report: &mut ValidationReport) {
+pub(super) fn check(
+    root: &Path,
+    packaged: bool,
+    report: &mut ValidationReport,
+) -> Option<runtime::Runtime> {
     report.check(
         !root.join(".claude-plugin").exists(),
         "only the .zcode-plugin manifest is supported",
     );
-    let Some(manifest) = files::json::<Manifest>(&root.join(".zcode-plugin/plugin.json"), report)
-    else {
-        return;
-    };
+    let manifest = files::json::<Manifest>(&root.join(".zcode-plugin/plugin.json"), report)?;
     report.check(
         valid_name(&manifest.name),
         "plugin name must match [a-z0-9][a-z0-9._-]{0,127}",
@@ -65,8 +66,9 @@ pub(super) fn check(root: &Path, packaged: bool, report: &mut ValidationReport) 
             format!("manifest {field} must reference the {field}/ directory"),
         );
     }
-    check_servers(root, &manifest.mcp_servers, packaged, report);
+    let selected = check_servers(root, &manifest.mcp_servers, packaged, report);
     marketplace::check(root, &manifest.name, &manifest.version, report);
+    selected
 }
 
 fn valid_name(name: &str) -> bool {
@@ -95,17 +97,19 @@ fn check_servers(
     servers: &BTreeMap<String, Server>,
     packaged: bool,
     report: &mut ValidationReport,
-) {
+) -> Option<runtime::Runtime> {
     let expected = ["codegraph", "grep", "osv-scanner", "scope", "semgrep"];
     report.check(
         servers.keys().map(String::as_str).eq(expected),
         "MCP servers must be scope, semgrep, osv-scanner, grep and codegraph",
     );
-    let native_scope = matches!(servers.get("scope"), Some(Server::Stdio { command, args })
-        if files::native_command(command) && args.as_slice() == ["scope-mcp"]);
+    let selected = match servers.get("scope") {
+        Some(Server::Stdio { command, args }) => runtime::parse(command, args, &["scope-mcp"]),
+        Some(Server::Http { .. }) | None => None,
+    };
     report.check(
-        native_scope,
-        "mcpServers.scope: native scope-mcp command required",
+        selected.is_some(),
+        "mcpServers.scope: exact native or universal scope-mcp command required",
     );
     for (name, server) in servers {
         match server {
@@ -131,6 +135,8 @@ fn check_servers(
             }
         }
     }
+    runtime::check_package(root, selected, packaged, report);
+    selected
 }
 
 pub(super) fn on_path(command: &str) -> bool {

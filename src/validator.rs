@@ -5,6 +5,7 @@ mod hooks;
 mod manifest;
 mod marketplace;
 mod routing;
+mod runtime;
 
 use std::{
     fmt,
@@ -94,8 +95,8 @@ pub fn validate(root: &Path, packaged: bool) -> Result<ValidationReport, Validat
         return Err(ValidationError::MissingRoot(root.to_owned()));
     }
     let mut report = ValidationReport::default();
-    manifest::check(root, packaged, &mut report);
-    hooks::check(root, packaged, &mut report);
+    let runtime = manifest::check(root, packaged, &mut report);
+    hooks::check(root, packaged, runtime, &mut report);
     agents::check(root, &mut report);
     content::check(root, &mut report);
     files::check_encoding(root, &mut report);

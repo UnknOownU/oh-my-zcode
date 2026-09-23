@@ -2,6 +2,10 @@
   "name": "oh-my-zcode",
   "version": "3.0.0",
   "description": "Evidence-gated ZCode pipeline: separate builders, reviewers and verifiers; PASS requires a matched execution result and unchanged source/artifact fingerprints. Research checks fetched citations; security checks scoped execution and explicit reproduction contracts.",
+  "description_i18n": {
+    "en": "Evidence-gated ZCode pipeline: separate builders, reviewers and verifiers; PASS requires a matched execution result and unchanged source/artifact fingerprints. Research checks fetched citations; security checks scoped execution and explicit reproduction contracts.",
+    "zh-CN": "证据门控的 ZCode 流水线：构建者、审查者和验证者相互独立；只有执行结果匹配且源代码与产物指纹未变化时才会通过。研究流程核验引用来源，安全流程核验执行范围和明确的复现约定。"
+  },
   "author": {
     "name": "UnknOownU",
     "url": "https://github.com/UnknOownU"
@@ -29,8 +33,9 @@
   "mcpServers": {
     "scope": {
       "type": "stdio",
-      "command": "${ZCODE_PLUGIN_ROOT}/bin/oh-my-zcode",
+      "command": "node",
       "args": [
+        "${ZCODE_PLUGIN_ROOT}/bin/launch.mjs",
         "scope-mcp"
       ]
     },
