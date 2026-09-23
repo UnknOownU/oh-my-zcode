@@ -5,10 +5,11 @@ mod universal;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::{fs, io::Read};
-use support::{Fixture, LINUX_X64, TestResult, VERSION, WINDOWS};
+use support::{Fixture, LINUX_X64, TARGETS, TestResult, VERSION, WINDOWS};
 
 #[derive(Deserialize)]
 struct Marketplace {
+    name: String,
     plugins: Vec<Plugin>,
 }
 #[derive(Deserialize)]
@@ -92,21 +93,31 @@ fn preserves_executable_permission_when_packaging_unix() -> TestResult {
 
 #[test]
 fn binds_marketplace_to_exact_archive_when_packaging() -> TestResult {
-    let fixture = Fixture::new()?;
-    assert!(fixture.run(WINDOWS)?.status.success());
-    let output = fixture.output(WINDOWS);
-    let market: Marketplace = serde_json::from_slice(&fs::read(output.join("marketplace.json"))?)?;
-    let plugin = market.plugins.first().ok_or("missing plugin")?;
-    let bytes = fs::read(output.join(format!("plugins/oh-my-zcode/{VERSION}/plugin.zip")))?;
-    assert_eq!(plugin.source.sha256, hex::encode(Sha256::digest(bytes)));
-    assert_eq!(plugin.version, VERSION);
-    assert_eq!(plugin.source.path, "oh-my-zcode");
-    assert_eq!(
-        plugin.source.url,
-        format!(
-            "https://downloads.example.com/releases/{VERSION}/x86_64-pc-windows-msvc/plugins/oh-my-zcode/{VERSION}/plugin.zip"
-        )
-    );
+    let mut fixture = Fixture::new()?;
+    for (target, executable) in TARGETS {
+        fixture.binary = fixture.binaries.join(target).join(executable);
+        let result = fixture.run(target)?;
+        assert!(
+            result.status.success(),
+            "{target}: {}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        let output = fixture.output(target);
+        let market: Marketplace =
+            serde_json::from_slice(&fs::read(output.join("marketplace.json"))?)?;
+        assert_eq!(market.name, "unknoownu", "{target}");
+        let plugin = market.plugins.first().ok_or("missing plugin")?;
+        let bytes = fs::read(output.join(format!("plugins/oh-my-zcode/{VERSION}/plugin.zip")))?;
+        assert_eq!(plugin.source.sha256, hex::encode(Sha256::digest(bytes)));
+        assert_eq!(plugin.version, VERSION);
+        assert_eq!(plugin.source.path, "oh-my-zcode");
+        assert_eq!(
+            plugin.source.url,
+            format!(
+                "https://downloads.example.com/releases/{VERSION}/{target}/plugins/oh-my-zcode/{VERSION}/plugin.zip"
+            )
+        );
+    }
     Ok(())
 }
 

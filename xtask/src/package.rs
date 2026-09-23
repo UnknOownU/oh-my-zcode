@@ -58,7 +58,6 @@ pub(crate) fn run(options: &Options) -> Result<()> {
     Publication {
         output: &options.output,
         segment: options.target.triple(),
-        marketplace_name: format!("oh-my-zcode-{}", options.target.triple()),
         marketplace_description: "Oh My Zcode native platform distribution",
     }
     .write(&base, &plugin, zip)
@@ -80,7 +79,6 @@ fn build_archive(options: &Options) -> Result<(manifests::Plugin, Vec<u8>)> {
 pub(crate) struct Publication<'a> {
     pub(crate) output: &'a Path,
     pub(crate) segment: &'a str,
-    pub(crate) marketplace_name: String,
     pub(crate) marketplace_description: &'static str,
 }
 
@@ -138,7 +136,7 @@ impl Publication<'_> {
         details: &PublishedArchive<'a>,
     ) -> Marketplace<'a> {
         Marketplace {
-            name: self.marketplace_name.clone(),
+            name: "unknoownu".to_owned(),
             description: self.marketplace_description,
             owner: Owner {
                 name: "UnknOownU",
