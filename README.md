@@ -6,19 +6,29 @@
 
 The home of **BetterZcode** — an evidence-gated pipeline plugin for ZCode:
 
-- **16 sealed agents** that explore, write, review, verify and sit on a blind council — no agent ever judges its own work, and the orchestrator never holds the pen
+- **17 sealed agents** that explore, write, review, verify and sit on a blind council — no agent ever judges its own work, and the orchestrator never holds the pen
 - **6 commands** — `/ohmy-council`, `/ohmy-plan`, `/ohmy-swarm`, `/ohmy-research`, `/ohmy-security`, `/ohmy-redteam`
 - **4 mechanical gates** — hooks that block a success verdict no executed test supports, a report citing a page never fetched, a security finding never reproduced, and attack commands fired without an authorized test/dev scope
 
-**This repository builds the Oh My Zcode plugin.** The plugin assets live in [`plugin/`](plugin/README.md); the first-party runtime is Rust. Version **3.0.0** is distributed as precompiled platform packages.
+**This repository builds the Oh My Zcode plugin.** The plugin assets live in [`plugin/`](plugin/README.md). Version **3.0.0** adds a universal package: a small Node launcher selects the bundled Rust executable for Windows x64, macOS Apple Silicon/Intel, or Linux x64/ARM64. No compiler is needed.
 
 ## Install
 
-1. Choose the precompiled package for Windows x64, macOS Intel/Apple Silicon, or Linux x64/ARM64.
-2. ZCode → **Settings → Plugins → Create → Add marketplace**, then add that platform's published marketplace URL.
-3. Install **`oh-my-zcode`**, restart ZCode, and start a **new session**.
+1. Install **Node.js 22 or newer**, with `node` available on `PATH`. Check with `node --version`, then fully restart ZCode if Node was just installed.
+2. If another copy is installed, uninstall it in **Settings → Plugins** first. Keep only one installation of `oh-my-zcode`.
+3. In **Settings → Plugins → Create → Add marketplace**, paste this exact JSON URL on **all supported platforms**:
 
-Rust and Node are not required by the bundled hooks or scope server. Codegraph is an optional external server that requires Node. See [installation and platform selection](plugin/docs/distribution.md). The repository checkout is for development; release artifacts must be published before their marketplace URLs can be used.
+   ```text
+   https://unknoownu.github.io/oh-my-zcode/marketplace.json
+   ```
+
+4. Open the added marketplace, install **`oh-my-zcode`**, quit ZCode completely, relaunch, and start a **new session**. On Windows, quit from the tray if the app remains running; on macOS, use **ZCode → Quit ZCode** or **⌘Q**.
+
+The [download page](https://unknoownu.github.io/oh-my-zcode/) also lists native packages that do not need Node for the hooks or scope server. The [installation guide](plugin/docs/distribution.md) explains which JSON URL or extracted folder to use. A ZIP download URL and the HTML download page are **not marketplace inputs**.
+
+## Update
+
+This correction remains **3.0.0**: uninstall an existing copy and install the corrected package from the JSON URL above. An equal version does not trigger a version-based update. For future releases, refresh the marketplace in ZCode's Plugins settings and install the offered update. Fully quit and relaunch ZCode, then open a new session. The session-start notice **only announces updates**; it does not install them. See [updates and reinstalling](plugin/docs/distribution.md#updates-and-reinstalling).
 
 ## What's in here
 
@@ -42,4 +52,4 @@ The 1.x line closed; the **2.x MCP era shipped 2026-08-21** — 5 MCP servers (s
 
 ---
 
-MIT · Private repository.
+MIT · Public source repository.

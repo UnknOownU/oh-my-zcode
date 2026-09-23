@@ -1,6 +1,20 @@
 # Distribution and installation
 
-The **3.0.0** plugin ships as a ZIP containing its native runtime and declarative assets. Users do not need Rust or a compiler. Hooks and the scope MCP server run the same bundled executable.
+## Recommended: one marketplace for every supported machine
+
+The **3.0.0 universal package** contains five precompiled Rust executables. A small launcher selects the one for your machine. Install **Node.js 22 or newer** and check `node --version`; ZCode must be able to find `node` on its `PATH`. No Rust toolchain, compiler, or npm install is needed for the hooks and scope server.
+
+Paste this exact URL in **ZCode → Settings → Plugins → Create → Add marketplace**:
+
+```text
+https://unknoownu.github.io/oh-my-zcode/marketplace.json
+```
+
+Open the added marketplace, install **oh-my-zcode**, completely quit and relaunch ZCode, then start a **new session**. On macOS, use **ZCode → Quit ZCode** or **⌘Q**. On Windows, quit from the tray menu if closing the window leaves the app running. Reopen ZCode after installing Node so it receives the updated `PATH`.
+
+If another copy is present, follow [updates and reinstalling](#updates-and-reinstalling) first. Installing from two marketplaces can create two copies.
+
+The [download page](https://unknoownu.github.io/oh-my-zcode/) is a page for people. **Add marketplace needs a URL ending in `marketplace.json`**, not that HTML page, a directory URL, a GitHub release page, or a ZIP URL. An error starting with `Unexpected token '<'` means the supplied URL returned HTML instead of JSON.
 
 | Machine | Target |
 |---|---|
@@ -10,33 +24,91 @@ The **3.0.0** plugin ships as a ZIP containing its native runtime and declarativ
 | Linux x64 | `x86_64-unknown-linux-musl` |
 | Linux ARM64 | `aarch64-unknown-linux-musl` |
 
-Each platform has its own `marketplace.json` and ZIP. All identify the plugin as `oh-my-zcode`, version `3.0.0`. Choose the marketplace for your operating system and architecture; ZCode's documented manifest format does not select an executable architecture automatically.
+Other operating systems and architectures, including native Windows ARM64, are not supported. On a Mac, **Apple menu → About This Mac** identifies the chip. The universal launcher selects the architecture of the running Node process; use native Node to run natively on Apple Silicon.
 
-## Install
+## Alternative: native packages without Node
 
-1. Download the distribution for your machine or obtain its HTTPS marketplace URL from the publisher.
-2. In ZCode, open **Settings → Plugins → Create → Add marketplace** and add that platform's marketplace URL. For a local installation, extract `plugin.zip` and add the extracted `oh-my-zcode` folder as a local plugin.
-3. Install `oh-my-zcode`, restart ZCode so its MCP declarations reload, and start a new session so hooks reload.
+These packages call Rust directly. Node is not required for their hooks or scope server. Choose **one** marketplace matching the machine that runs the plugin:
 
-The repository checkout contains source code. Installing it directly is not the supported end-user distribution path. Release archives are produced and checked by CI; availability depends on the publisher making those artifacts accessible.
+| Machine | Marketplace JSON URL |
+|---|---|
+| Windows x64 | <https://unknoownu.github.io/oh-my-zcode/latest/x86_64-pc-windows-msvc/marketplace.json> |
+| macOS Apple Silicon | <https://unknoownu.github.io/oh-my-zcode/latest/aarch64-apple-darwin/marketplace.json> |
+| macOS Intel | <https://unknoownu.github.io/oh-my-zcode/latest/x86_64-apple-darwin/marketplace.json> |
+| Linux x64 | <https://unknoownu.github.io/oh-my-zcode/latest/x86_64-unknown-linux-musl/marketplace.json> |
+| Linux ARM64 | <https://unknoownu.github.io/oh-my-zcode/latest/aarch64-unknown-linux-musl/marketplace.json> |
 
-The marketplace records a SHA-256 checksum of its ZIP, and ZCode's verified ZIP installation checks that digest before extraction. Keep versioned archives immutable. The packager refuses to replace an existing archive with different bytes.
+Their marketplace names are `oh-my-zcode-<target>`; the universal marketplace is `unknoownu`. These identities matter when removing a duplicate. Use the stable URLs above for installation and future updates.
+
+## Manual installation and ZIP recovery
+
+Download the **plugin ZIP** from the [download page](https://unknoownu.github.io/oh-my-zcode/), for the universal package or your native platform, and extract it. Its root must contain:
+
+```text
+oh-my-zcode/
+  .zcode-plugin/plugin.json
+  agents/
+  commands/
+  skills/
+  hooks/hooks.json
+  bin/
+```
+
+On macOS, **⌘⇧.** shows hidden folders such as `.zcode-plugin` in Finder. GitHub Release distribution ZIPs contain `marketplace.json`, `SHA256SUMS`, and a nested `plugins/oh-my-zcode/3.0.0/plugin.zip`. Extract that inner ZIP to obtain the plugin folder shown above. The download page links directly to the inner ZIP.
+
+For a local marketplace, put the extracted `oh-my-zcode` folder beside a new `marketplace.json`, inside a folder such as `oh-my-zcode-local/`:
+
+```json
+{
+  "name": "oh-my-zcode-local",
+  "description": "Local Oh My Zcode installation",
+  "owner": { "name": "UnknOownU" },
+  "plugins": [{
+    "name": "oh-my-zcode",
+    "source": "./oh-my-zcode",
+    "version": "3.0.0",
+    "description": "Evidence-gated ZCode pipeline"
+  }]
+}
+```
+
+Use the version in the extracted `.zcode-plugin/plugin.json` if installing another release. In **Add marketplace**, select the enclosing `oh-my-zcode-local` folder containing this JSON, then install the listed plugin. The inner plugin folder alone is not a marketplace. Local installations need manual replacement for future updates.
+
+Do not paste a ZIP URL into Add marketplace. If ZCode reports `git clone ...zip.git`, it has interpreted the input as a repository. Return to the JSON URL above. The repository checkout is for development; it does not contain the built native binaries.
+
+## Updates and reinstalling
+
+**Routine updates from a stable HTTPS marketplace:** refresh/update the existing marketplace in Plugins settings, update the installed plugin when a newer version is offered, then completely quit and relaunch ZCode and start a new session. Keep the same marketplace identity. The plugin's update notice does not download or install anything.
+
+**Installing this corrected 3.0.0 package over an existing copy:** the version is unchanged, so a version-based update will not offer this correction. Reinstall it:
+
+1. Identify the existing `betterzcode` or `oh-my-zcode` installation and its marketplace in Plugins settings. Uninstall the old plugin before installing the replacement. If two copies exist, remove the unwanted one there.
+2. Remove an obsolete marketplace only after uninstalling its plugin. Add the stable universal JSON URL, or the stable native JSON URL for your platform if you want to keep the no-Node package.
+3. Install one copy, fully restart ZCode, and start a new session. Confirm `/ohmy-plan`, `/ohmy-swarm`, and `/ohmy-research` are available and that the session received the pipeline doctrine.
+
+Uninstalling does not require deleting your project's `.oh-my-zcode/` evidence or plans. Do not delete it during duplicate cleanup. When diagnosing installation, inspect ZCode's `installed_plugins.json` and its recorded installation path rather than assuming every marketplace uses the `unknoownu` cache directory.
+
+The official ZAI marketplace can offer this plugin only after its maintainers accept and publish it. A submitted pull request alone does not make it available there.
 
 ## Optional external servers
 
-The gates and scope MCP server require no Node runtime. Other MCP servers remain separate tools:
+Native packages run the gates and scope server without Node; the universal package requires Node 22+ for its launcher. Other MCP servers remain separate tools:
 
 - **Codegraph** requires Node and npm. From the installed plugin directory, run `npm --prefix vendor/codegraph ci --omit=dev --no-audit --no-fund`, then restart ZCode. Its dependency lockfile selects the package version and npm selects its platform dependency. No first-party hook runs npm or downloads tools.
 - **Semgrep** requires the `semgrep` command on `PATH`.
 - **OSV Scanner** requires the `osv-scanner` command on `PATH`.
 - **grep.app** uses an external HTTP server.
 
-An unavailable optional server does not prevent the bundled gates or scope server from running.
+An unavailable optional server does not prevent the bundled gates or scope server from running. The universal launcher's Node requirement is separate from these optional servers.
 
 ## Update notice
 
-At session start the native binary compares the installed version against the published marketplace (one anonymous GET of the public `marketplace.json`, 2s cap, `curl` on PATH — no payload, no identifier). When a newer version exists, one line is appended to the injected doctrine: `UPDATE oh-my-zcode: <latest> available (installed <v>)`. Everything fails open: offline, missing curl, malformed manifest or an unparseable version produce silence, never an error.
+At session start the native binary compares the installed version against the [published marketplace](https://unknoownu.github.io/oh-my-zcode/marketplace.json): one anonymous GET, two-second timeout, `curl` on PATH, no project files, payload, or identifier. A newer version adds `UPDATE oh-my-zcode: <latest> available (installed <v>)` to the doctrine. Offline access, missing curl, or an invalid response does not prevent session startup.
 
-The check is rate-limited to one attempt per 24h. Its state lives in `~/.zcode/cli/plugins/data/oh-my-zcode@unknoownu/update-check.json`; setting `"disabled": true` there is the kill switch. `OH_MY_ZCODE_UPDATE_URL` (a `file://` URL works for tests) and `OH_MY_ZCODE_UPDATE_STATE` are environment overrides. The plugin root is derived from the binary's own location (`<root>/bin/`); `ZCODE_PLUGIN_ROOT` overrides it.
+The check writes its state to `~/.zcode/cli/plugins/data/oh-my-zcode@unknoownu/update-check.json` and runs at most once per 24 hours. Set `"disabled": true` in that JSON file to disable it. `OH_MY_ZCODE_UPDATE_URL` and `OH_MY_ZCODE_UPDATE_STATE` are test/configuration overrides. The universal launcher sets `ZCODE_PLUGIN_ROOT` to the actual installed root before starting the nested Rust executable.
+
+The launcher runs only bundled local binaries. On macOS/Linux it restores the selected binary's owner-execute permission when an extractor has removed it. Permission failures are reported. It does not download binaries or elevate privileges.
+
+The marketplace binds every ZIP to its SHA-256 checksum, which ZCode verifies before extraction. This repair replaces the current **3.0.0** distributions and removes the obsolete publication format. There is no compatibility layer or automatic migration of older installations.
 
 The package format follows the [official ZCode verified ZIP distribution contract](https://github.com/zai-org/zcode-plugins/blob/cf739288297533abaa5eec9561bd1cb96e328532/docs/distribution.md).
