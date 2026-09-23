@@ -79,8 +79,7 @@ def validate_distribution(
         or plugin.source.url != f"{base}{version}/{kind}/{artifact}"
     ):
         raise PublicationError(f"metadata mismatch: {version}/{kind}")
-    expected_name = "unknoownu" if kind == "universal" else f"oh-my-zcode-{kind}"
-    if market.name != expected_name:
+    if market.name != "unknoownu":
         raise PublicationError(f"marketplace identity mismatch: {version}/{kind}")
     return files
 

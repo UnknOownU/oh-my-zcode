@@ -85,6 +85,8 @@ Linux ARM64          https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-unkno
 
 On a Mac, **Apple menu → About This Mac** identifies the chip (Apple M1–M4 is Apple Silicon; an Intel processor listing is Intel). A universal package — a small Node launcher over five native binaries, one URL for every machine — publishes with the **next release**; see [distribution and installation](docs/distribution.md).
 
+Today's live **3.0.0** marketplaces are named `oh-my-zcode-<target>`. From the **next release**, all native and universal marketplaces use **`unknoownu`**, keeping the plugin identity `oh-my-zcode@unknoownu` stable. Adding another `unknoownu` URL replaces the registered source, not the installed files; keep one source for your machine. Old target-named and local marketplaces remain separate identities.
+
 ### Install 3.0.0
 
 1. If BetterZcode or another `oh-my-zcode` copy is installed from an older marketplace or a local folder, uninstall that copy first. Duplicate plugin identities can prevent installation.
@@ -96,7 +98,7 @@ For a manual local marketplace, **Add marketplace** takes a folder containing `m
 
 ### Update
 
-For a future release, refresh the `unknoownu` marketplace in ZCode's Plugins settings, then choose the plugin update when the host offers one. Fully quit and relaunch ZCode and start a new session after updating. The session-start notice only announces a newer version; it never installs or applies updates automatically. A same-version correction, including switching between the universal and native 3.0.0 packages, requires uninstalling the existing copy and performing a clean install once from the desired marketplace. See [distribution and installation](docs/distribution.md) for the published-pages endpoint and local package details.
+When moving from an old target-named or local marketplace to `unknoownu` at the next release, uninstall the old plugin before removing its marketplace, then add the desired new source and install once. After that, refresh `unknoownu` in ZCode's Plugins settings and choose the plugin update when offered. Fully quit and relaunch ZCode and start a new session after updating. The session-start notice only announces a newer version; it never installs or applies updates automatically. A same-version correction, including switching between the universal and native 3.0.0 packages, requires uninstalling the existing copy and performing a clean install once from the desired marketplace. See [distribution and installation](docs/distribution.md) for the published-pages endpoint and local package details.
 
 ### Agent-assisted install prompt
 

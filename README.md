@@ -28,6 +28,8 @@ The home of **BetterZcode** — an evidence-gated pipeline plugin for ZCode:
    On a Mac, **Apple menu → About This Mac** tells the chip: Apple M1–M4 is Apple Silicon; an Intel processor listing is Intel.
 3. Open the added marketplace, install **`oh-my-zcode`**, quit ZCode completely, relaunch, and start a **new session**. On Windows, quit from the tray if the app remains running; on macOS, use **ZCode → Quit ZCode** or **⌘Q**.
 
+Today's live **3.0.0** marketplaces are named `oh-my-zcode-<target>`. From the **next release**, all native and universal marketplaces use **`unknoownu`**, keeping the plugin identity `oh-my-zcode@unknoownu` stable. Adding another `unknoownu` URL replaces the registered source, not the installed files; keep one source for your machine. Uninstall an old target-named or local copy before removing its marketplace and installing from `unknoownu`.
+
 The [installation guide](plugin/docs/distribution.md) covers the same URLs, manual ZIP installs, and updates. A ZIP download URL and the HTML download page are **not marketplace inputs**.
 
 ## Update

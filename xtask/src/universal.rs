@@ -26,7 +26,6 @@ pub(crate) fn run(options: &Options) -> Result<()> {
     Publication {
         output: &options.output,
         segment: "universal",
-        marketplace_name: "unknoownu".to_owned(),
         marketplace_description: "Oh My Zcode universal distribution",
     }
     .write(&base, &plugin, zip)

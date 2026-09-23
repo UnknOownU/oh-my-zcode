@@ -40,7 +40,7 @@ def marketplace_bytes(version: str, kind: str, plugin: bytes) -> bytes:
     digest = hashlib.sha256(plugin).hexdigest()
     artifact = f"plugins/oh-my-zcode/{version}/plugin.zip"
     document = {
-        "name": "unknoownu" if kind == "universal" else f"oh-my-zcode-{kind}",
+        "name": "unknoownu",
         "description": "test distribution",
         "owner": {"name": "UnknOownU", "url": "https://github.com/UnknOownU"},
         "plugins": [
@@ -124,6 +124,10 @@ class PublishPagesTests(unittest.TestCase):
                     site / "3.0.0" / kind / "plugins/oh-my-zcode/3.0.0/plugin.zip"
                 )
                 self.assertEqual(f"plugin-3.0.0-{kind}".encode(), artifact.read_bytes())
+                market = json.loads(
+                    (site / "3.0.0" / kind / "marketplace.json").read_bytes()
+                )
+                self.assertEqual("unknoownu", market["name"])
             self.assertEqual(
                 marketplace_bytes("3.0.0", "universal", b"plugin-3.0.0-universal"),
                 (site / "marketplace.json").read_bytes(),

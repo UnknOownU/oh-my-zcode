@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import tempfile
@@ -23,7 +24,13 @@ import warnings
 import zipfile
 from pathlib import Path
 
-from test_publish_pages import BASE_URL, KINDS, SCRIPT, write_distribution_asset
+from test_publish_pages import (
+    BASE_URL,
+    KINDS,
+    SCRIPT,
+    marketplace_bytes,
+    write_distribution_asset,
+)
 
 
 class PublicationRejectionTests(unittest.TestCase):
@@ -147,6 +154,29 @@ class PublicationRejectionTests(unittest.TestCase):
             self.assertNotEqual(0, result.returncode)
             self.assertIn("publication failed", result.stderr)
             self.assertFalse(site.exists())
+
+    def test_target_specific_marketplace_identities_are_rejected(self) -> None:
+        for kind in KINDS:
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                release = self.complete_release(root / "releases")
+                plugin = f"plugin-3.0.1-{kind}".encode()
+                market = json.loads(marketplace_bytes("3.0.1", kind, plugin))
+                market["name"] = f"oh-my-zcode-{kind}"
+                _ = write_distribution_asset(
+                    release,
+                    "3.0.1",
+                    kind,
+                    plugin=plugin,
+                    marketplace=json.dumps(market).encode(),
+                )
+
+                site = root / "site"
+                result = self.assemble(root / "releases", site)
+
+                self.assertNotEqual(0, result.returncode)
+                self.assertIn("marketplace identity mismatch", result.stderr)
+                self.assertFalse(site.exists())
 
     def test_nested_or_backslash_members_are_rejected(self) -> None:
         # Given a release asset in the old nested Windows archive shape.
