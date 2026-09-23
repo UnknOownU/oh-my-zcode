@@ -16,7 +16,9 @@ On a Mac, **Apple menu → About This Mac** identifies the chip: an "Apple M1/M2
 
 Open the added marketplace, install **oh-my-zcode**, completely quit and relaunch ZCode, then start a **new session**. On macOS, use **ZCode → Quit ZCode** or **⌘Q**. On Windows, quit from the tray menu if closing the window leaves the app running.
 
-If another copy is present, follow [updates and reinstalling](#updates-and-reinstalling) first. Installing from two marketplaces can create two copies. These marketplaces are named `oh-my-zcode-<target>`; the future universal marketplace is named `unknoownu`. These identities matter when removing a duplicate.
+If another copy is present, follow [updates and reinstalling](#updates-and-reinstalling) first. The live **3.0.0** marketplaces above are still named `oh-my-zcode-<target>`. Starting with the **next release**, every native marketplace and the universal marketplace use the publisher name **`unknoownu`**, matching the repository's development marketplace. Platform selection remains in the URL, not the marketplace name.
+
+ZCode keys marketplaces by `name` in `known_marketplaces.json`: adding another source named `unknoownu` replaces that entry rather than adding a separate marketplace. The installed plugin identity stays `oh-my-zcode@unknoownu` across these sources. Keep exactly one source appropriate for your machine; older target-named or local marketplaces remain separate identities and can still leave duplicate installations.
 
 The [download page](https://unknoownu.github.io/oh-my-zcode/) is a page for people. **Add marketplace needs a URL ending in `marketplace.json`**, not that HTML page, a directory URL, a GitHub release page, or a ZIP URL. An error starting with `Unexpected token '<'` means the supplied URL returned HTML instead of JSON.
 
@@ -66,11 +68,13 @@ Do not paste a ZIP URL into Add marketplace. If ZCode reports `git clone ...zip.
 
 **Routine updates from a stable HTTPS marketplace:** refresh/update the existing marketplace in Plugins settings, update the installed plugin when a newer version is offered, then completely quit and relaunch ZCode and start a new session. Keep the same marketplace identity. The plugin's update notice does not download or install anything.
 
-**Installing this corrected 3.0.0 package over an existing copy:** the version is unchanged, so a version-based update will not offer this correction. Reinstall it:
+**Moving from an old identity or reinstalling a same-version package:** changing a marketplace name does not migrate an installed plugin, and an equal version does not trigger an update. When the next release becomes available, move from `oh-my-zcode@oh-my-zcode-<target>` (or a local identity) to `oh-my-zcode@unknoownu` with a clean reinstall:
 
 1. Identify the existing `betterzcode` or `oh-my-zcode` installation and its marketplace in Plugins settings. Uninstall the old plugin before installing the replacement. If two copies exist, remove the unwanted one there.
-2. Remove an obsolete marketplace only after uninstalling its plugin. Add the stable universal JSON URL, or the stable native JSON URL for your platform if you want to keep the no-Node package.
+2. Remove an obsolete marketplace only after uninstalling its plugin. Today, use the versioned native JSON URL for your platform above. From the next release, choose the stable universal JSON URL or the stable native JSON URL for your platform if you want to keep the no-Node package; both register as `unknoownu`.
 3. Install one copy, fully restart ZCode, and start a new session. Confirm `/ohmy-plan`, `/ohmy-swarm`, and `/ohmy-research` are available and that the session received the pipeline doctrine.
+
+After moving to `unknoownu`, switching between native and universal URLs replaces the registered source without creating another plugin identity; it does not replace already installed package files. Reinstall when switching package forms at the same version.
 
 Uninstalling does not require deleting your project's `.oh-my-zcode/` evidence or plans. Do not delete it during duplicate cleanup. When diagnosing installation, inspect ZCode's `installed_plugins.json` and its recorded installation path rather than assuming every marketplace uses the `unknoownu` cache directory.
 

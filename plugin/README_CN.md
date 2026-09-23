@@ -44,6 +44,8 @@ Linux ARM64          https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-unkno
 
 在 Mac 上，**苹果菜单 → 关于本机** 可以判断芯片：Apple M1–M4 是 Apple Silicon；标有 Intel 处理器的是 Intel。通用包（一个小型 Node 启动器加五个原生二进制，全平台一个 URL）将随**下一个版本**发布；详见[分发与安装](docs/distribution.md)。
 
+当前在线的 **3.0.0** marketplace 仍名为 `oh-my-zcode-<target>`。从**下一个版本**起，所有原生和通用 marketplace 统一使用发布者名称 **`unknoownu`**，插件身份固定为 `oh-my-zcode@unknoownu`。添加另一个名为 `unknoownu` 的 URL 会替换已注册的源，但不会替换已安装的文件；请只保留适合当前机器的一个源。旧的按平台命名的 marketplace 和本地 marketplace 仍是独立身份。
+
 ### 安装 3.0.0
 
 1. 如果旧 marketplace 或本地文件夹中安装了 BetterZcode 或另一个 `oh-my-zcode`，先在 **Settings → Plugins** 中卸载旧副本。重复的插件身份会阻止通用包安装。
@@ -55,7 +57,7 @@ Linux ARM64          https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-unkno
 
 ### 更新
 
-将来发布新版本时，在 ZCode 的 Plugins 设置中刷新 `unknoownu` marketplace，然后在主机提供新版本时选择插件更新。更新后完全退出并重新启动 ZCode，再开始新会话。会话开始时的提示只会通知有新版本，不会自动下载或安装更新。同一版本的修正（包括在通用包和原生 3.0.0 包之间切换）需要先卸载现有副本，再从目标 marketplace 完整安装一次。发布页面 endpoint 和本地包细节见[分发与安装](docs/distribution.md)。
+下一个版本发布后，从旧的按平台命名或本地 marketplace 迁移到 `unknoownu` 时，请先卸载旧插件，再移除旧 marketplace，然后添加所需的新源并只安装一次。此后，在 ZCode 的 Plugins 设置中刷新 `unknoownu`，并在主机提供新版本时选择插件更新。更新后完全退出并重新启动 ZCode，再开始新会话。会话开始时的提示只会通知有新版本，不会自动下载或安装更新。同一版本的修正（包括在通用包和原生 3.0.0 包之间切换）需要先卸载现有副本，再从目标 marketplace 完整安装一次。发布页面 endpoint 和本地包细节见[分发与安装](docs/distribution.md)。
 
 ### 让 agent 协助安装
 

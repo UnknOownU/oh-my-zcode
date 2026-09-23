@@ -1,6 +1,6 @@
 # Versioning — the policy
 
-> **Current source version: 3.0.0.** The installation repair stays on this exact version. It replaces the broken distributions, adds the universal package and corrects marketplace metadata and documentation. Build evidence records the source commit and archive checksums. The [published marketplace](https://unknoownu.github.io/oh-my-zcode/marketplace.json) identifies the available universal package.
+> **Current source version: 3.0.0.** The installation repair stays on this exact version. It replaces the broken distributions, adds the universal package and corrects marketplace metadata and documentation. Build evidence records the source commit and archive checksums. The [published marketplace](https://unknoownu.github.io/oh-my-zcode/marketplace.json) activates with the **next release** and will identify the available universal package; today use the per-platform URLs in [distribution and installation](distribution.md).
 
 ---
 
