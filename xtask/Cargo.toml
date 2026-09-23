@@ -15,7 +15,7 @@ sha2 = "0.10"
 hex = "0.4"
 thiserror = "2"
 url = "2"
-zip = { version = "8.6", default-features = false }
+zip = { version = "8.6", default-features = false, features = ["deflate"] }
 tempfile = "3"
 wait-timeout = "0.2"
 object = { version = "0.40", default-features = false, features = ["read_core", "std", "elf", "macho", "pe"] }
