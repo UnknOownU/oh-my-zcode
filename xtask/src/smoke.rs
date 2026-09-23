@@ -39,11 +39,7 @@ pub(crate) fn run(path: &Path, target: Target, universal: bool) -> Result<()> {
     fs::create_dir(&extraction)?;
     archive.extract(&extraction)?;
     let plugin = extraction.join("oh-my-zcode");
-    let runtime = if universal {
-        Runtime::universal(&plugin)
-    } else {
-        Runtime::native(&plugin, target)
-    };
+    let runtime = Runtime::for_package(&plugin, target, universal);
     exercise_runtime(&runtime, &plugin)?;
     println!("PASS sha256={digest} archive={}", path.display());
     Ok(())
@@ -56,6 +52,22 @@ struct Runtime {
 }
 
 impl Runtime {
+    fn for_package(plugin: &Path, target: Target, universal: bool) -> Self {
+        if universal {
+            Self::universal(plugin)
+        } else {
+            Self::native(plugin, target)
+        }
+    }
+
+    fn command(&self) -> Command {
+        let mut command = Command::new(&self.program);
+        if let Some(launcher) = &self.launcher {
+            command.arg(launcher);
+        }
+        command
+    }
+
     fn native(plugin: &Path, target: Target) -> Self {
         Self {
             program: plugin.join("bin").join(target.executable()),
@@ -121,11 +133,8 @@ fn inspect_entries(archive: &mut zip::ZipArchive<Cursor<Vec<u8>>>) -> Result<()>
 }
 
 fn execute(runtime: &Runtime, arguments: &[&str], stdin: &[u8]) -> Result<Vec<u8>> {
-    let mut command = Command::new(&runtime.program);
-    if let Some(launcher) = &runtime.launcher {
-        command.arg(launcher);
-    }
-    let mut child = command
+    let mut child = runtime
+        .command()
         .args(arguments)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
