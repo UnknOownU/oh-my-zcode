@@ -201,15 +201,15 @@ jobs:
           path: distributions
       - name: Test publication boundaries
         run: |
-          uv run --with 'pydantic>=2,<3' --with 'typer>=0.12,<1' scripts/test_publish_pages.py
-          uv run --with 'pydantic>=2,<3' --with 'typer>=0.12,<1' scripts/test_publish_pages_negative.py
+          uv run --project scripts --locked python scripts/test_publish_pages.py
+          uv run --project scripts --locked python scripts/test_publish_pages_negative.py
       - name: Build portable release assets and exact Pages tree
         run: |
           for path in distributions/distribution-*; do
             kind="${path##*/distribution-}"
-            uv run scripts/publish_pages.py bundle --source "$path" --version 3.0.0 --kind "$kind" --base-url https://unknoownu.github.io/oh-my-zcode/ --output "releases/v3.0.0/oh-my-zcode-3.0.0-$kind.zip"
+            uv run --project scripts --locked python scripts/publish_pages.py bundle --source "$path" --version 3.0.0 --kind "$kind" --base-url https://unknoownu.github.io/oh-my-zcode/ --output "releases/v3.0.0/oh-my-zcode-3.0.0-$kind.zip"
           done
-          uv run scripts/publish_pages.py assemble --releases releases --output site --base-url https://unknoownu.github.io/oh-my-zcode/
+          uv run --project scripts --locked python scripts/publish_pages.py assemble --releases releases --output site --base-url https://unknoownu.github.io/oh-my-zcode/
           node --input-type=module <<'JS'
           import {readFileSync, readdirSync, writeFileSync} from 'node:fs';
           import {createHash} from 'node:crypto';
@@ -240,6 +240,7 @@ jobs:
       actions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: release-assets
@@ -251,4 +252,29 @@ jobs:
           gh release upload v3.0.0 release-assets/* --clobber
           obsolete=$(gh release view v3.0.0 --json assets --jq '.assets[] | select(.name == "oh-my-zcode-3.0.0-windows-marketplace.zip") | .name')
           if [[ -n "$obsolete" ]]; then gh release delete-asset v3.0.0 "$obsolete" --yes; fi
+          dispatch_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           gh workflow run pages.yml --ref main
+          run_id=''
+          for _ in {1..30}; do
+            while IFS=$'\t' read -r candidate created_at; do
+              if [[ "$created_at" > "$dispatch_started" || "$created_at" == "$dispatch_started" ]]; then
+                run_id="$candidate"
+                break
+              fi
+            done < <(gh run list --workflow pages.yml --branch main --event workflow_dispatch --limit 10 --json databaseId,createdAt --jq '.[] | [.databaseId, .createdAt] | @tsv')
+            if [[ -n "$run_id" ]]; then break; fi
+            sleep 2
+          done
+          if [[ -z "$run_id" ]]; then
+            echo 'Pages workflow did not start after dispatch' >&2
+            exit 1
+          fi
+          gh run watch "$run_id" --exit-status
+          for _ in {1..10}; do
+            if uv run --project scripts --locked python scripts/verify_published.py --base-url https://unknoownu.github.io/oh-my-zcode/ --version 3.0.0; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'Public Pages verification did not converge' >&2
+          exit 1

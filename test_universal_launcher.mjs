@@ -7,9 +7,11 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  realpathSync,
   readFileSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -93,6 +95,29 @@ const makeFixture = (withRuntime = true) => {
         : "ok - inherited stdio, exact argv, plugin root, exit status, and Unix execute repair",
     );
   } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+}
+
+{
+  const fixture = makeFixture();
+  const aliasParent = mkdtempSync(join(tmpdir(), "oh-my-zcode-alias-"));
+  try {
+    const aliasRoot = join(aliasParent, "plugin");
+    symlinkSync(fixture.root, aliasRoot, process.platform === "win32" ? "junction" : "dir");
+    const aliasLauncher = join(aliasRoot, "bin", "launch.mjs");
+    assert.notEqual(
+      pathToFileURL(aliasLauncher).href,
+      pathToFileURL(realpathSync(aliasLauncher)).href,
+    );
+    const child = join(fixture.root, "alias-probe.mjs");
+    writeFileSync(child, "console.error('alias-entry-ran'); process.exitCode = 43;\n");
+    const result = spawnSync(process.execPath, [aliasLauncher, child], { encoding: "utf8" });
+    assert.equal(result.status, 43, result.stderr);
+    assert.match(result.stderr, /alias-entry-ran/);
+    console.log("ok - launcher entry detection survives a filesystem alias");
+  } finally {
+    rmSync(aliasParent, { recursive: true, force: true });
     rmSync(fixture.root, { recursive: true, force: true });
   }
 }

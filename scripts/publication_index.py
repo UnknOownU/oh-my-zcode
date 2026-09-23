@@ -3,7 +3,7 @@
 # dependencies = []
 # ///
 # ─── How to run ───
-# Imported by: uv run scripts/publish_pages.py assemble --help
+# Imported by: uv run --project scripts --locked python scripts/publish_pages.py assemble --help
 # ─────────────────
 """Render the small public download index from validated versions."""
 

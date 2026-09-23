@@ -1,9 +1,9 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["pydantic>=2,<3"]
+# dependencies = ["pydantic==2.11.9"]
 # ///
 # ─── How to run ───
-# Imported by: uv run scripts/publish_pages.py --help
+# Imported by: uv run --project scripts --locked python scripts/publish_pages.py --help
 # ─────────────────
 """Typed boundaries for immutable distribution metadata."""
 

@@ -1,14 +1,14 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["pydantic>=2,<3", "typer>=0.12,<1"]
+# dependencies = ["pydantic==2.11.9", "typer==0.17.4"]
 # ///
 
 # ─── How to run ───
 # 1. Install uv (if not installed):
 #      curl -LsSf https://astral.sh/uv/install.sh | sh
 # 2. Run directly (no venv, no pip install needed):
-#      uv run scripts/test_publish_pages_negative.py
+#      uv run --project scripts --locked python scripts/test_publish_pages_negative.py
 # 3. Or run with Python 3.11+:
 #      python scripts/test_publish_pages_negative.py
 # ─────────────────

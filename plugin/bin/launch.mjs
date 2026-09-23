@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { chmodSync, existsSync, statSync } from "node:fs";
+import { chmodSync, existsSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -79,8 +79,16 @@ async function main() {
   });
 }
 
-const entry = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : "";
-if (entry === import.meta.url) {
+function isEntryPoint() {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isEntryPoint()) {
   try {
     await main();
   } catch (error) {

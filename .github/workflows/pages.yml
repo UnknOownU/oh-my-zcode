@@ -28,9 +28,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release download v3.0.0 --pattern 'oh-my-zcode-3.0.0-*.zip' --dir releases/v3.0.0
-          uv run scripts/publish_pages.py assemble --releases releases --output site --base-url https://unknoownu.github.io/oh-my-zcode/
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+          uv run --project scripts --locked python scripts/publish_pages.py assemble --releases releases --output site --base-url https://unknoownu.github.io/oh-my-zcode/
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa
         with:
           path: site
 
@@ -42,4 +42,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e

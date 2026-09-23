@@ -1,11 +1,11 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["pydantic>=2,<3", "typer>=0.12,<1"]
+# dependencies = ["pydantic==2.11.9", "typer==0.17.4"]
 # ///
 # ─── How to run ───
-# uv run scripts/publish_pages.py --help
-# uv run --with pydantic --with typer scripts/test_publish_pages.py
+# uv run --project scripts --locked python scripts/publish_pages.py --help
+# uv run --project scripts --locked python scripts/test_publish_pages.py
 # ─────────────────
 """Assemble Pages from immutable release assets, without rebuilding binaries."""
 
@@ -13,8 +13,9 @@ from __future__ import annotations
 
 import tempfile
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, cast
 
 import typer
 from publication_archive import read_archive, validate_distribution, write_bundle
@@ -33,8 +34,9 @@ from publication_models import (
 from pydantic import ValidationError
 
 app = typer.Typer(pretty_exceptions_enable=False)
-PathOption = Annotated[Path, typer.Option()]
-TextOption = Annotated[str, typer.Option()]
+option_factory = cast(Callable[[], object], typer.Option)
+PathOption = Annotated[Path, option_factory()]
+TextOption = Annotated[str, option_factory()]
 
 
 def release_files(release: Path, version: str, base: str) -> tuple[SiteFile, ...]:
