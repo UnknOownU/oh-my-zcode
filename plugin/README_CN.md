@@ -32,7 +32,7 @@ oh-my-zcode 是一个带证据门控的 ZCode 插件。它把写入、评审和�
 
 ## 安装和更新
 
-当前公开归档是 **3.0.0**：每个平台一个原生包，hooks 和 scope server 不需要 Node.js。在 **Settings → Plugins → Create → Add marketplace** 中，粘贴运行 ZCode 的那台机器对应的 JSON URL（只选一个）：
+当前公开版本是 **3.0.0**：提供一个通用包及每个平台的原生包。原生包的 hooks 和 scope server 不需要 Node.js。安装原生包时，在 **Settings → Plugins → Create → Add marketplace** 中，粘贴运行 ZCode 的那台机器对应的 JSON URL（只选一个）：
 
 ```text
 Windows x64          https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-pc-windows-msvc/marketplace.json
@@ -42,14 +42,14 @@ Linux x64            https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-unknow
 Linux ARM64          https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-unknown-linux-musl/marketplace.json
 ```
 
-在 Mac 上，**苹果菜单 → 关于本机** 可以判断芯片：Apple M1–M4 是 Apple Silicon；标有 Intel 处理器的是 Intel。通用包（一个小型 Node 启动器加五个原生二进制，全平台一个 URL）将随**下一个版本**发布；详见[分发与安装](docs/distribution.md)。
+在 Mac 上，**苹果菜单 → 关于本机** 可以判断芯片：Apple M1–M4 是 Apple Silicon；标有 Intel 处理器的是 Intel。推荐的通用包（一个小型 Node 启动器加五个原生二进制）现已上线，URL 为 `https://unknoownu.github.io/oh-my-zcode/marketplace.json`，需要 **Node.js 22+**。原生包的稳定别名 `https://unknoownu.github.io/oh-my-zcode/latest/<target>/marketplace.json` 也已上线；上方带版本号的 URL 仍然有效。详见[分发与安装](docs/distribution.md)。
 
-当前在线的 **3.0.0** marketplace 仍名为 `oh-my-zcode-<target>`。从**下一个版本**起，所有原生和通用 marketplace 统一使用发布者名称 **`unknoownu`**，插件身份固定为 `oh-my-zcode@unknoownu`。添加另一个名为 `unknoownu` 的 URL 会替换已注册的源，但不会替换已安装的文件；请只保留适合当前机器的一个源。旧的按平台命名的 marketplace 和本地 marketplace 仍是独立身份。
+当前在线的 **3.0.0** 原生和通用 marketplace 均使用发布者名称 **`unknoownu`**，插件身份固定为 `oh-my-zcode@unknoownu`。此前的原生分发使用 `oh-my-zcode-<target>`；从这些源安装的现有副本仍保留旧身份。添加另一个名为 `unknoownu` 的 URL 会替换已注册的源，但不会替换已安装的文件；请只保留适合当前机器的一个源。旧的按平台命名的 marketplace 和本地 marketplace 仍是独立身份。
 
 ### 安装 3.0.0
 
 1. 如果旧 marketplace 或本地文件夹中安装了 BetterZcode 或另一个 `oh-my-zcode`，先在 **Settings → Plugins** 中卸载旧副本。重复的插件身份会阻止通用包安装。
-2. 打开 **Settings → Plugins → Create → Add marketplace**，粘贴上表中你这台机器的精确 JSON URL。
+2. 打开 **Settings → Plugins → Create → Add marketplace**，粘贴通用包的 JSON URL（需要 Node.js 22+），或上表中你这台机器对应的一个原生包 JSON URL。
 3. 打开刚添加的 marketplace，只安装一次 `oh-my-zcode`。
 4. 完全退出并重新启动 ZCode，然后开始一个**新会话**。Windows 如果进程仍在运行，请从托盘退出；macOS 使用 **ZCode → Quit ZCode** 或 **⌘Q**。
 
@@ -57,7 +57,7 @@ Linux ARM64          https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-unkno
 
 ### 更新
 
-下一个版本发布后，从旧的按平台命名或本地 marketplace 迁移到 `unknoownu` 时，请先卸载旧插件，再移除旧 marketplace，然后添加所需的新源并只安装一次。此后，在 ZCode 的 Plugins 设置中刷新 `unknoownu`，并在主机提供新版本时选择插件更新。更新后完全退出并重新启动 ZCode，再开始新会话。会话开始时的提示只会通知有新版本，不会自动下载或安装更新。同一版本的修正（包括在通用包和原生 3.0.0 包之间切换）需要先卸载现有副本，再从目标 marketplace 完整安装一次。发布页面 endpoint 和本地包细节见[分发与安装](docs/distribution.md)。
+从旧的按平台命名或本地 marketplace 迁移到已上线的 `unknoownu` marketplace 时，请先卸载旧插件，再移除旧 marketplace，然后添加所需的新源并只安装一次。此后，在 ZCode 的 Plugins 设置中刷新 `unknoownu`，并在主机提供新版本时选择插件更新。更新后完全退出并重新启动 ZCode，再开始新会话。会话开始时的提示只会通知有新版本，不会自动下载或安装更新。同一版本的修正（包括在通用包和原生 3.0.0 包之间切换）需要先卸载现有副本，再从目标 marketplace 完整安装一次。发布页面 endpoint 和本地包细节见[分发与安装](docs/distribution.md)。
 
 ### 让 agent 协助安装
 
@@ -85,7 +85,7 @@ Linux ARM64          https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-unkno
 - `osv-scanner` 要求 `osv-scanner` 可执行文件在 `PATH` 中，并启动 `osv-scanner experimental-mcp`。
 - `codegraph` 要求 Node 和 npm。可以在已安装的插件目录中选择执行 `npm --prefix vendor/codegraph ci --omit=dev --no-audit --no-fund`；这会从 npm 下载锁定的包及其平台依赖。锁文件记录 `@colbymchenry/codegraph` 1.5.0 的许可证为 MIT。本归档没有可核验的源代码仓库，因此不猜测 GitHub 地址，使用 [npm registry 记录](https://registry.npmjs.org/@colbymchenry%2Fcodegraph)作为包来源链接。
 
-更新提示每 24 小时最多执行一次匿名 `curl` GET，超时上限为 2 秒，目标是发布 Pages 的 marketplace endpoint（`https://unknoownu.github.io/oh-my-zcode/marketplace.json`；该 endpoint 随下一个版本发布启用，在此之前检查会静默放行）。请求不携带 payload 或标识符；请求失败或 manifest 无法解析时静默失败。它只通知新版本，不会自动安装。状态按用户写入 `~/.zcode/cli/plugins/data/oh-my-zcode@unknoownu/update-check.json`；将 `disabled` 设为 `true` 可以关闭检查。`OH_MY_ZCODE_UPDATE_URL` 和 `OH_MY_ZCODE_UPDATE_STATE` 是配置/测试覆盖项。准确行为以[分发指南](docs/distribution.md)为准。
+更新提示每 24 小时最多执行一次匿名 `curl` GET，超时上限为 2 秒，目标是发布 Pages 的 marketplace endpoint（`https://unknoownu.github.io/oh-my-zcode/marketplace.json`）。请求不携带 payload 或标识符；请求失败或 manifest 无法解析时静默失败。它只通知新版本，不会自动安装。状态按用户写入 `~/.zcode/cli/plugins/data/oh-my-zcode@unknoownu/update-check.json`；将 `disabled` 设为 `true` 可以关闭检查。`OH_MY_ZCODE_UPDATE_URL` 和 `OH_MY_ZCODE_UPDATE_STATE` 是配置/测试覆盖项。准确行为以[分发指南](docs/distribution.md)为准。
 
 命令要求研究时还可能使用 ZCode 提供的 WebFetch/WebSearch。这些请求、ZAI 模型调用、可选的 grep.app、可选的 npm 安装，以及配置后的 Semgrep/OSV 请求都属于外部网络活动。通用启动器本身不会在运行时下载二进制。
 

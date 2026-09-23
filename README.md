@@ -10,12 +10,12 @@ The home of **BetterZcode** — an evidence-gated pipeline plugin for ZCode:
 - **6 commands** — `/ohmy-council`, `/ohmy-plan`, `/ohmy-swarm`, `/ohmy-research`, `/ohmy-security`, `/ohmy-redteam`
 - **4 mechanical gates** — hooks that block a success verdict no executed test supports, a report citing a page never fetched, a security finding never reproduced, and attack commands fired without an authorized test/dev scope
 
-**This repository builds the Oh My Zcode plugin.** The plugin assets live in [`plugin/`](plugin/README.md). Version **3.0.0** ships one native package per platform — no Node.js, compiler, or npm install required. A universal package with a single marketplace URL publishes with the next release.
+**This repository builds the Oh My Zcode plugin.** The plugin assets live in [`plugin/`](plugin/README.md). Version **3.0.0** ships one native package per platform — no Node.js, compiler, or npm install required. The universal package is also live, with one marketplace URL for all supported machines and a Node.js 22+ requirement.
 
 ## Install
 
 1. If another copy is installed, uninstall it in **Settings → Plugins** first. Keep only one installation of `oh-my-zcode`.
-2. In **Settings → Plugins → Create → Add marketplace**, paste the JSON URL for your machine:
+2. In **Settings → Plugins → Create → Add marketplace**, paste `https://unknoownu.github.io/oh-my-zcode/marketplace.json` for the recommended universal package (Node.js 22+), or choose one native URL for your machine:
 
    | Machine | Marketplace JSON URL |
    |---|---|
@@ -28,9 +28,9 @@ The home of **BetterZcode** — an evidence-gated pipeline plugin for ZCode:
    On a Mac, **Apple menu → About This Mac** tells the chip: Apple M1–M4 is Apple Silicon; an Intel processor listing is Intel.
 3. Open the added marketplace, install **`oh-my-zcode`**, quit ZCode completely, relaunch, and start a **new session**. On Windows, quit from the tray if the app remains running; on macOS, use **ZCode → Quit ZCode** or **⌘Q**.
 
-Today's live **3.0.0** marketplaces are named `oh-my-zcode-<target>`. From the **next release**, all native and universal marketplaces use **`unknoownu`**, keeping the plugin identity `oh-my-zcode@unknoownu` stable. Adding another `unknoownu` URL replaces the registered source, not the installed files; keep one source for your machine. Uninstall an old target-named or local copy before removing its marketplace and installing from `unknoownu`.
+Today's live **3.0.0** native and universal marketplaces all use **`unknoownu`**, keeping the plugin identity `oh-my-zcode@unknoownu` stable. Earlier native distributions used `oh-my-zcode-<target>`; existing installations from those sources still have the old identity. Adding another `unknoownu` URL replaces the registered source, not the installed files; keep one source for your machine. Uninstall an old target-named or local copy before removing its marketplace and installing from `unknoownu`.
 
-The [installation guide](plugin/docs/distribution.md) covers the same URLs, manual ZIP installs, and updates. A ZIP download URL and the HTML download page are **not marketplace inputs**.
+Stable native aliases at `https://unknoownu.github.io/oh-my-zcode/latest/<target>/marketplace.json` are also live; the versioned URLs above remain valid. The [installation guide](plugin/docs/distribution.md) covers these URLs, manual ZIP installs, and updates. A ZIP download URL and the HTML download page are **not marketplace inputs**.
 
 ## Update
 

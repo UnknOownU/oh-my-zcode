@@ -73,7 +73,7 @@ Each command works alone; the chain above is the natural flow. The `SessionStart
 
 ## Getting Started
 
-The current public archive is **3.0.0**: one native package per platform, no Node.js required for the hooks or the scope server. In **Settings → Plugins → Create → Add marketplace**, paste the JSON URL for the machine that runs ZCode — choose exactly one:
+The current public release is **3.0.0**: a universal package and one native package per platform. Native packages need no Node.js for the hooks or the scope server. To install a native package, in **Settings → Plugins → Create → Add marketplace**, paste the JSON URL for the machine that runs ZCode — choose exactly one:
 
 ```text
 Windows x64          https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-pc-windows-msvc/marketplace.json
@@ -83,14 +83,14 @@ Linux x64            https://unknoownu.github.io/oh-my-zcode/3.0.0/x86_64-unknow
 Linux ARM64          https://unknoownu.github.io/oh-my-zcode/3.0.0/aarch64-unknown-linux-musl/marketplace.json
 ```
 
-On a Mac, **Apple menu → About This Mac** identifies the chip (Apple M1–M4 is Apple Silicon; an Intel processor listing is Intel). A universal package — a small Node launcher over five native binaries, one URL for every machine — publishes with the **next release**; see [distribution and installation](docs/distribution.md).
+On a Mac, **Apple menu → About This Mac** identifies the chip (Apple M1–M4 is Apple Silicon; an Intel processor listing is Intel). The recommended universal package — a small Node launcher over five native binaries — is live at `https://unknoownu.github.io/oh-my-zcode/marketplace.json` and requires **Node.js 22+**. Stable native aliases at `https://unknoownu.github.io/oh-my-zcode/latest/<target>/marketplace.json` are also live; the versioned URLs above remain valid. See [distribution and installation](docs/distribution.md).
 
-Today's live **3.0.0** marketplaces are named `oh-my-zcode-<target>`. From the **next release**, all native and universal marketplaces use **`unknoownu`**, keeping the plugin identity `oh-my-zcode@unknoownu` stable. Adding another `unknoownu` URL replaces the registered source, not the installed files; keep one source for your machine. Old target-named and local marketplaces remain separate identities.
+Today's live **3.0.0** native and universal marketplaces all use **`unknoownu`**, keeping the plugin identity `oh-my-zcode@unknoownu` stable. Earlier native distributions used `oh-my-zcode-<target>`; existing installations from those sources still have the old identity. Adding another `unknoownu` URL replaces the registered source, not the installed files; keep one source for your machine. Old target-named and local marketplaces remain separate identities.
 
 ### Install 3.0.0
 
 1. If BetterZcode or another `oh-my-zcode` copy is installed from an older marketplace or a local folder, uninstall that copy first. Duplicate plugin identities can prevent installation.
-2. Open **Settings → Plugins → Create → Add marketplace** and paste the exact JSON URL for your machine from the table above.
+2. Open **Settings → Plugins → Create → Add marketplace** and paste the universal JSON URL (Node.js 22+), or one native JSON URL for your machine from the table above.
 3. Open the added marketplace and install `oh-my-zcode` once.
 4. Fully quit and relaunch ZCode, then start a **new session**. On Windows, quit from the tray when the process remains there; on macOS, use **ZCode → Quit ZCode** or **⌘Q**.
 
@@ -98,7 +98,7 @@ For a manual local marketplace, **Add marketplace** takes a folder containing `m
 
 ### Update
 
-When moving from an old target-named or local marketplace to `unknoownu` at the next release, uninstall the old plugin before removing its marketplace, then add the desired new source and install once. After that, refresh `unknoownu` in ZCode's Plugins settings and choose the plugin update when offered. Fully quit and relaunch ZCode and start a new session after updating. The session-start notice only announces a newer version; it never installs or applies updates automatically. A same-version correction, including switching between the universal and native 3.0.0 packages, requires uninstalling the existing copy and performing a clean install once from the desired marketplace. See [distribution and installation](docs/distribution.md) for the published-pages endpoint and local package details.
+When moving from an old target-named or local marketplace to the live `unknoownu` marketplace, uninstall the old plugin before removing its marketplace, then add the desired new source and install once. After that, refresh `unknoownu` in ZCode's Plugins settings and choose the plugin update when offered. Fully quit and relaunch ZCode and start a new session after updating. The session-start notice only announces a newer version; it never installs or applies updates automatically. A same-version correction, including switching between the universal and native 3.0.0 packages, requires uninstalling the existing copy and performing a clean install once from the desired marketplace. See [distribution and installation](docs/distribution.md) for the published-pages endpoint and local package details.
 
 ### Agent-assisted install prompt
 
@@ -127,7 +127,7 @@ The following integrations are optional and run only when their MCP server or co
 - `osv-scanner` needs the `osv-scanner` executable on `PATH` and starts `osv-scanner experimental-mcp`.
 - `codegraph` needs Node and npm. From the installed plugin directory, opt in with `npm --prefix vendor/codegraph ci --omit=dev --no-audit --no-fund`; this can download the locked package and its platform dependency from npm. The lockfile records `@colbymchenry/codegraph` 1.5.0 as MIT. Its source repository is not asserted because it is not available in this checkout; use the [npm registry record](https://registry.npmjs.org/@colbymchenry%2Fcodegraph) rather than a guessed source link.
 
-The update notice makes at most one anonymous `curl` GET per 24 hours, with a 2-second cap, against the published-pages marketplace endpoint (`https://unknoownu.github.io/oh-my-zcode/marketplace.json`; that endpoint activates with the next release — until then the check fails open). It sends no payload or identifier and fails open when the request or manifest cannot be read. The check only announces a newer version; it never downloads or installs one. Its state is stored per user at `~/.zcode/cli/plugins/data/oh-my-zcode@unknoownu/update-check.json`; set `"disabled": true` there to disable the check. `OH_MY_ZCODE_UPDATE_URL` and `OH_MY_ZCODE_UPDATE_STATE` are configuration/test overrides. See [distribution and installation](docs/distribution.md) for the authoritative behavior.
+The update notice makes at most one anonymous `curl` GET per 24 hours, with a 2-second cap, against the published-pages marketplace endpoint (`https://unknoownu.github.io/oh-my-zcode/marketplace.json`). It sends no payload or identifier and fails open when the request or manifest cannot be read. The check only announces a newer version; it never downloads or installs one. Its state is stored per user at `~/.zcode/cli/plugins/data/oh-my-zcode@unknoownu/update-check.json`; set `"disabled": true` there to disable the check. `OH_MY_ZCODE_UPDATE_URL` and `OH_MY_ZCODE_UPDATE_STATE` are configuration/test overrides. See [distribution and installation](docs/distribution.md) for the authoritative behavior.
 
 Agents can also use the ZCode-provided WebFetch/WebSearch tools when a command asks for research. Those requests, the ZAI model calls, optional grep.app traffic, optional npm install, and configured Semgrep/OSV traffic are external network activity. The universal launcher itself never downloads a binary at runtime.
 
