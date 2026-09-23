@@ -1,9 +1,10 @@
 use crate::{smoke_protocol, target::Target};
 use sha2::{Digest, Sha256};
 use std::{
+    collections::BTreeSet,
     fs,
     io::{Cursor, Write},
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     time::Duration,
 };
@@ -25,32 +26,84 @@ pub(crate) enum Error {
     Process { command: String, stderr: String },
 }
 
-pub(crate) fn run(path: &Path, target: Target) -> Result<()> {
+pub(crate) fn run(path: &Path, target: Target, universal: bool) -> Result<()> {
     let bytes = fs::read(path)?;
     let digest = hex::encode(Sha256::digest(&bytes));
     let temporary = tempfile::tempdir()?;
     let mut archive = zip::ZipArchive::new(Cursor::new(bytes))?;
     inspect_entries(&mut archive)?;
-    archive.extract(temporary.path())?;
-    let plugin = temporary.path().join("oh-my-zcode");
-    let binary = plugin.join("bin").join(target.executable());
-    exercise_runtime(&binary, &plugin)?;
+    if universal {
+        inspect_universal_entries(&archive)?;
+    }
+    let extraction = temporary.path().join("archive with spaces");
+    fs::create_dir(&extraction)?;
+    archive.extract(&extraction)?;
+    let plugin = extraction.join("oh-my-zcode");
+    let runtime = if universal {
+        Runtime::universal(&plugin)
+    } else {
+        Runtime::native(&plugin, target)
+    };
+    exercise_runtime(&runtime, &plugin)?;
     println!("PASS sha256={digest} archive={}", path.display());
     Ok(())
 }
 
-fn exercise_runtime(binary: &Path, plugin: &Path) -> Result<()> {
-    let version = execute(binary, &["--version"], b"")?;
-    if version != b"oh-my-zcode 3.0.0\n" {
+#[derive(Debug)]
+struct Runtime {
+    program: PathBuf,
+    launcher: Option<PathBuf>,
+}
+
+impl Runtime {
+    fn native(plugin: &Path, target: Target) -> Self {
+        Self {
+            program: plugin.join("bin").join(target.executable()),
+            launcher: None,
+        }
+    }
+
+    fn universal(plugin: &Path) -> Self {
+        Self {
+            program: PathBuf::from("node"),
+            launcher: Some(plugin.join("bin/launch.mjs")),
+        }
+    }
+}
+
+fn exercise_runtime(runtime: &Runtime, plugin: &Path) -> Result<()> {
+    let version = execute(runtime, &["--version"], b"")?;
+    let expected = format!("oh-my-zcode {}\n", env!("CARGO_PKG_VERSION"));
+    if version != expected.as_bytes() {
         return Err(Error::Contract("unexpected binary version"));
     }
-    smoke_protocol::hook(&execute(binary, &["hook", "session_start"], b"{}")?)?;
+    smoke_protocol::hook(&execute(runtime, &["hook", "session_start"], b"{}")?)?;
     let requests = b"{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}\n";
-    smoke_protocol::mcp(&execute(binary, &["scope-mcp"], requests)?)?;
+    smoke_protocol::mcp(&execute(runtime, &["scope-mcp"], requests)?)?;
     let plugin_path = plugin
         .to_str()
         .ok_or(Error::Contract("non-UTF8 package path"))?;
-    execute(binary, &["validate", plugin_path, "--packaged"], b"")?;
+    execute(runtime, &["validate", plugin_path, "--packaged"], b"")?;
+    Ok(())
+}
+
+fn inspect_universal_entries(archive: &zip::ZipArchive<Cursor<Vec<u8>>>) -> Result<()> {
+    let names: BTreeSet<_> = archive.file_names().collect();
+    if !names.contains("oh-my-zcode/bin/launch.mjs") {
+        return Err(Error::Contract("universal archive is missing its launcher"));
+    }
+    for target in Target::ALL {
+        let path = format!(
+            "oh-my-zcode/bin/{}/{}",
+            target.triple(),
+            target.executable()
+        );
+        if !names.contains(path.as_str()) {
+            return Err(Error::Contract(
+                "universal archive is missing a native runtime",
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -67,8 +120,12 @@ fn inspect_entries(archive: &mut zip::ZipArchive<Cursor<Vec<u8>>>) -> Result<()>
     Ok(())
 }
 
-fn execute(binary: &Path, arguments: &[&str], stdin: &[u8]) -> Result<Vec<u8>> {
-    let mut child = Command::new(binary)
+fn execute(runtime: &Runtime, arguments: &[&str], stdin: &[u8]) -> Result<Vec<u8>> {
+    let mut command = Command::new(&runtime.program);
+    if let Some(launcher) = &runtime.launcher {
+        command.arg(launcher);
+    }
+    let mut child = command
         .args(arguments)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

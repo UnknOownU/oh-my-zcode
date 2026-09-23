@@ -1,12 +1,11 @@
 mod support;
+#[path = "package/universal.rs"]
+mod universal;
 
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::{fs, io::Read};
-use support::{Fixture, TestResult};
-
-const WINDOWS: &str = "x86_64-pc-windows-msvc";
-const LINUX: &str = "x86_64-unknown-linux-musl";
+use support::{Fixture, LINUX_X64, TestResult, VERSION, WINDOWS};
 
 #[derive(Deserialize)]
 struct Marketplace {
@@ -45,10 +44,11 @@ fn packages_only_release_assets_when_local_state_exists() -> TestResult {
     );
     let archive_path = fixture
         .output(WINDOWS)
-        .join("plugins/oh-my-zcode/3.0.0/plugin.zip");
+        .join(format!("plugins/oh-my-zcode/{VERSION}/plugin.zip"));
     let mut archive = zip::ZipArchive::new(fs::File::open(archive_path)?)?;
     let names: Vec<_> = archive.file_names().collect();
     assert!(names.contains(&"oh-my-zcode/bin/oh-my-zcode.exe"));
+    assert!(names.contains(&"oh-my-zcode/README_CN.md"));
     assert!(!names.iter().any(|name| {
         let forbidden_extension = std::path::Path::new(name)
             .extension()
@@ -80,10 +80,10 @@ fn packages_only_release_assets_when_local_state_exists() -> TestResult {
 fn preserves_executable_permission_when_packaging_unix() -> TestResult {
     let fixture = Fixture::new()?;
     fs::write(&fixture.binary, support::binaries::linux(62, false)?)?;
-    assert!(fixture.run(LINUX)?.status.success());
+    assert!(fixture.run(LINUX_X64)?.status.success());
     let path = fixture
-        .output(LINUX)
-        .join("plugins/oh-my-zcode/3.0.0/plugin.zip");
+        .output(LINUX_X64)
+        .join(format!("plugins/oh-my-zcode/{VERSION}/plugin.zip"));
     let mut archive = zip::ZipArchive::new(fs::File::open(path)?)?;
     let binary = archive.by_name("oh-my-zcode/bin/oh-my-zcode")?;
     assert_eq!(binary.unix_mode().map(|mode| mode & 0o777), Some(0o755));
@@ -97,13 +97,15 @@ fn binds_marketplace_to_exact_archive_when_packaging() -> TestResult {
     let output = fixture.output(WINDOWS);
     let market: Marketplace = serde_json::from_slice(&fs::read(output.join("marketplace.json"))?)?;
     let plugin = market.plugins.first().ok_or("missing plugin")?;
-    let bytes = fs::read(output.join("plugins/oh-my-zcode/3.0.0/plugin.zip"))?;
+    let bytes = fs::read(output.join(format!("plugins/oh-my-zcode/{VERSION}/plugin.zip")))?;
     assert_eq!(plugin.source.sha256, hex::encode(Sha256::digest(bytes)));
-    assert_eq!(plugin.version, "3.0.0");
+    assert_eq!(plugin.version, VERSION);
     assert_eq!(plugin.source.path, "oh-my-zcode");
     assert_eq!(
         plugin.source.url,
-        "https://downloads.example.com/releases/v3.0.0/x86_64-pc-windows-msvc/plugins/oh-my-zcode/3.0.0/plugin.zip"
+        format!(
+            "https://downloads.example.com/releases/{VERSION}/x86_64-pc-windows-msvc/plugins/oh-my-zcode/{VERSION}/plugin.zip"
+        )
     );
     Ok(())
 }
@@ -114,7 +116,7 @@ fn rejects_changed_bytes_when_version_already_packaged() -> TestResult {
     assert!(fixture.run(WINDOWS)?.status.success());
     let archive = fixture
         .output(WINDOWS)
-        .join("plugins/oh-my-zcode/3.0.0/plugin.zip");
+        .join(format!("plugins/oh-my-zcode/{VERSION}/plugin.zip"));
     let original = fs::read(&archive)?;
     fs::write(fixture.plugin.join("README.md"), b"changed asset")?;
     assert!(!fixture.run(WINDOWS)?.status.success());
@@ -128,7 +130,7 @@ fn repeats_identically_when_source_and_binary_are_unchanged() -> TestResult {
     assert!(fixture.run(WINDOWS)?.status.success());
     let path = fixture
         .output(WINDOWS)
-        .join("plugins/oh-my-zcode/3.0.0/plugin.zip");
+        .join(format!("plugins/oh-my-zcode/{VERSION}/plugin.zip"));
     let original = fs::read(&path)?;
     assert!(fixture.run(WINDOWS)?.status.success());
     assert_eq!(fs::read(path)?, original);
@@ -140,7 +142,7 @@ fn restores_missing_checksum_when_identical_package_is_resumed() -> TestResult {
     let fixture = Fixture::new()?;
     assert!(fixture.run(WINDOWS)?.status.success());
     let output = fixture.output(WINDOWS);
-    let archive = output.join("plugins/oh-my-zcode/3.0.0/plugin.zip");
+    let archive = output.join(format!("plugins/oh-my-zcode/{VERSION}/plugin.zip"));
     let checksum = output.join("SHA256SUMS");
     let original_archive = fs::read(&archive)?;
     let original_modified = fs::metadata(&archive)?.modified()?;
@@ -188,7 +190,7 @@ fn rejects_wrong_architecture_when_target_label_is_arm64() -> TestResult {
 fn rejects_dynamic_interpreter_when_target_requires_static_musl() -> TestResult {
     let fixture = Fixture::new()?;
     fs::write(&fixture.binary, support::binaries::linux(62, true)?)?;
-    assert!(!fixture.run(LINUX)?.status.success());
+    assert!(!fixture.run(LINUX_X64)?.status.success());
     Ok(())
 }
 
@@ -211,6 +213,6 @@ fn rejects_missing_entry_point_when_executable_header_is_present() -> TestResult
         .ok_or("missing ELF entry field")?
         .fill(0);
     fs::write(&fixture.binary, bytes)?;
-    assert!(!fixture.run(LINUX)?.status.success());
+    assert!(!fixture.run(LINUX_X64)?.status.success());
     Ok(())
 }

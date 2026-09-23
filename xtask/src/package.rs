@@ -20,6 +20,12 @@ pub(crate) enum Error {
     Zip(#[from] zip::result::ZipError),
     #[error(transparent)]
     Binary(#[from] artifact::Error),
+    #[error("invalid universal runtime for {target}: {source}")]
+    UniversalBinary {
+        target: &'static str,
+        #[source]
+        source: artifact::Error,
+    },
     #[error("unsafe package path: {0}")]
     UnsafePath(PathBuf),
     #[error("unsupported release asset: {0}")]
@@ -49,15 +55,13 @@ pub(crate) struct Options {
 pub(crate) fn run(options: &Options) -> Result<()> {
     let base = distribution_url(&options.base_url)?;
     let (plugin, zip) = build_archive(options)?;
-    let files = distribution_files(options, &base, &plugin, zip)?;
-    for (path, bytes) in &files {
-        archive::ensure_unchanged(path, bytes)?;
+    Publication {
+        output: &options.output,
+        segment: options.target.triple(),
+        marketplace_name: format!("oh-my-zcode-{}", options.target.triple()),
+        marketplace_description: "Oh My Zcode native platform distribution",
     }
-    for (path, bytes) in &files {
-        archive::write_once(path, bytes)?;
-    }
-    println!("{}", options.output.join(options.target.triple()).display());
-    Ok(())
+    .write(&base, &plugin, zip)
 }
 
 fn build_archive(options: &Options) -> Result<(manifests::Plugin, Vec<u8>)> {
@@ -73,34 +77,92 @@ fn build_archive(options: &Options) -> Result<(manifests::Plugin, Vec<u8>)> {
     Ok((plugin, archive::encode(entries)?))
 }
 
-fn distribution_files(
-    options: &Options,
-    base: &url::Url,
-    plugin: &manifests::Plugin,
-    zip: Vec<u8>,
-) -> Result<[(PathBuf, Vec<u8>); 3]> {
-    let digest = hex::encode(Sha256::digest(&zip));
-    let path = format!("plugins/{}/{}/plugin.zip", plugin.name, plugin.version);
-    let url = format!("{}{}/{}", base, options.target.triple(), path);
-    let details = PublishedArchive {
-        url: &url,
-        digest: &digest,
-        path: &path,
-        size: zip.len(),
-    };
-    let marketplace = marketplace(plugin, options.target, &details);
-    let output = options.output.join(options.target.triple());
-    Ok([
-        (output.join(&path), zip),
-        (
-            output.join("SHA256SUMS"),
-            format!("{digest}  {path}\n").into_bytes(),
-        ),
-        (
-            output.join("marketplace.json"),
-            serde_json::to_vec_pretty(&marketplace)?,
-        ),
-    ])
+pub(crate) struct Publication<'a> {
+    pub(crate) output: &'a Path,
+    pub(crate) segment: &'a str,
+    pub(crate) marketplace_name: String,
+    pub(crate) marketplace_description: &'static str,
+}
+
+impl Publication<'_> {
+    pub(crate) fn write(
+        self,
+        base: &url::Url,
+        plugin: &manifests::Plugin,
+        zip: Vec<u8>,
+    ) -> Result<()> {
+        let files = self.files(base, plugin, zip)?;
+        for (path, bytes) in &files {
+            archive::ensure_unchanged(path, bytes)?;
+        }
+        for (path, bytes) in &files {
+            archive::write_once(path, bytes)?;
+        }
+        println!("{}", self.output.join(self.segment).display());
+        Ok(())
+    }
+
+    fn files(
+        &self,
+        base: &url::Url,
+        plugin: &manifests::Plugin,
+        zip: Vec<u8>,
+    ) -> Result<[(PathBuf, Vec<u8>); 3]> {
+        let digest = hex::encode(Sha256::digest(&zip));
+        let path = format!("plugins/{}/{}/plugin.zip", plugin.name, plugin.version);
+        let url = format!("{}{}/{}", base, self.segment, path);
+        let details = PublishedArchive {
+            url: &url,
+            digest: &digest,
+            path: &path,
+            size: zip.len(),
+        };
+        let marketplace = self.marketplace(plugin, &details);
+        let output = self.output.join(self.segment);
+        Ok([
+            (output.join(&path), zip),
+            (
+                output.join("SHA256SUMS"),
+                format!("{digest}  {path}\n").into_bytes(),
+            ),
+            (
+                output.join("marketplace.json"),
+                serde_json::to_vec_pretty(&marketplace)?,
+            ),
+        ])
+    }
+
+    fn marketplace<'a>(
+        &self,
+        plugin: &'a manifests::Plugin,
+        details: &PublishedArchive<'a>,
+    ) -> Marketplace<'a> {
+        Marketplace {
+            name: self.marketplace_name.clone(),
+            description: self.marketplace_description,
+            owner: Owner {
+                name: "UnknOownU",
+                url: "https://github.com/UnknOownU",
+            },
+            plugins: [Listing {
+                name: &plugin.name,
+                version: &plugin.version,
+                description: &plugin.description,
+                source: Source {
+                    origin: "url",
+                    kind: "zip",
+                    url: details.url,
+                    sha256: details.digest,
+                    path: &plugin.name,
+                },
+                artifact: Artifact {
+                    path: details.path,
+                    sha256: details.digest,
+                    size: details.size,
+                },
+            }],
+        }
+    }
 }
 
 struct PublishedArchive<'a> {
@@ -110,39 +172,7 @@ struct PublishedArchive<'a> {
     size: usize,
 }
 
-fn marketplace<'a>(
-    plugin: &'a manifests::Plugin,
-    target: Target,
-    details: &PublishedArchive<'a>,
-) -> Marketplace<'a> {
-    Marketplace {
-        name: format!("oh-my-zcode-{}", target.triple()),
-        description: "Oh My Zcode native platform distribution",
-        owner: Owner {
-            name: "UnknOownU",
-            url: "https://github.com/UnknOownU",
-        },
-        plugins: [Listing {
-            name: &plugin.name,
-            version: &plugin.version,
-            description: &plugin.description,
-            source: Source {
-                origin: "url",
-                kind: "zip",
-                url: details.url,
-                sha256: details.digest,
-                path: &plugin.name,
-            },
-            artifact: Artifact {
-                path: details.path,
-                sha256: details.digest,
-                size: details.size,
-            },
-        }],
-    }
-}
-
-fn distribution_url(raw: &str) -> Result<url::Url> {
+pub(crate) fn distribution_url(raw: &str) -> Result<url::Url> {
     let mut url = url::Url::parse(raw).map_err(|_| Error::BaseUrl)?;
     let has_credentials = !url.username().is_empty() || url.password().is_some();
     if url.scheme() != "https"

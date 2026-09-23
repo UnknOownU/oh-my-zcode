@@ -39,6 +39,7 @@ pub(crate) fn collect(root: &Path) -> Result<Vec<Entry>> {
     }
     for file in [
         "README.md",
+        "README_CN.md",
         "vendor/codegraph/package.json",
         "vendor/codegraph/package-lock.json",
     ] {
@@ -55,6 +56,14 @@ pub(crate) fn collect(root: &Path) -> Result<Vec<Entry>> {
     reject_link(&license)?;
     entries.push(Entry::new(Path::new("LICENSE"), fs::read(license)?, false)?);
     Ok(entries)
+}
+
+pub(crate) fn launcher(root: &Path) -> Result<Entry> {
+    let path = root.join("bin/launch.mjs");
+    if !reject_link(&path)?.is_file() {
+        return Err(Error::UnsafePath(path));
+    }
+    Entry::new(Path::new("bin/launch.mjs"), fs::read(path)?, false)
 }
 
 fn collect_tree(root: &Path, directory: &Path, entries: &mut Vec<Entry>) -> Result<()> {

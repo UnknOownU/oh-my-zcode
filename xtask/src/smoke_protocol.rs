@@ -84,7 +84,7 @@ fn check_initialize(response: &RpcResult<Initialize>) -> Result<()> {
     if !valid_envelope
         || response.result.protocol != "2024-11-05"
         || server.name != "oh-my-zcode-scope"
-        || server.version != "3.0.0"
+        || server.version != env!("CARGO_PKG_VERSION")
     {
         return Err(Error::Contract("unexpected MCP initialize result"));
     }
@@ -97,9 +97,11 @@ mod tests {
 
     #[test]
     fn rejects_success_exit_payload_without_registered_tools() {
-        let output = br#"{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","serverInfo":{"name":"oh-my-zcode-scope","version":"3.0.0"}}}
-{"jsonrpc":"2.0","id":2,"result":{"tools":[]}}"#;
-        assert!(mcp(output).is_err());
+        let output = format!(
+            "{{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{{\"protocolVersion\":\"2024-11-05\",\"serverInfo\":{{\"name\":\"oh-my-zcode-scope\",\"version\":\"{}\"}}}}}}\n{{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{{\"tools\":[]}}}}",
+            env!("CARGO_PKG_VERSION")
+        );
+        assert!(mcp(output.as_bytes()).is_err());
     }
 
     #[test]
