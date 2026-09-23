@@ -1,6 +1,6 @@
 # Distribution and installation
 
-## Recommended: the native marketplace for your machine
+## Native marketplaces — no Node.js required
 
 Version **3.0.0** publishes one marketplace per platform. Each package runs the Rust binary directly — **no Node.js, compiler, or npm install is required** for the hooks and the scope server. In **ZCode → Settings → Plugins → Create → Add marketplace**, paste the JSON URL matching the machine that runs ZCode — choose exactly one:
 
@@ -16,17 +16,17 @@ On a Mac, **Apple menu → About This Mac** identifies the chip: an "Apple M1/M2
 
 Open the added marketplace, install **oh-my-zcode**, completely quit and relaunch ZCode, then start a **new session**. On macOS, use **ZCode → Quit ZCode** or **⌘Q**. On Windows, quit from the tray menu if closing the window leaves the app running.
 
-If another copy is present, follow [updates and reinstalling](#updates-and-reinstalling) first. The live **3.0.0** marketplaces above are still named `oh-my-zcode-<target>`. Starting with the **next release**, every native marketplace and the universal marketplace use the publisher name **`unknoownu`**, matching the repository's development marketplace. Platform selection remains in the URL, not the marketplace name.
+If another copy is present, follow [updates and reinstalling](#updates-and-reinstalling) first. Today's live **3.0.0** native and universal marketplaces all use the publisher name **`unknoownu`**, matching the repository's development marketplace. Earlier 3.0.0 native distributions used `oh-my-zcode-<target>`; existing installations from those sources keep their old identities until reinstalled. Platform selection remains in the URL, not the marketplace name.
 
 ZCode keys marketplaces by `name` in `known_marketplaces.json`: adding another source named `unknoownu` replaces that entry rather than adding a separate marketplace. The installed plugin identity stays `oh-my-zcode@unknoownu` across these sources. Keep exactly one source appropriate for your machine; older target-named or local marketplaces remain separate identities and can still leave duplicate installations.
 
 The [download page](https://unknoownu.github.io/oh-my-zcode/) is a page for people. **Add marketplace needs a URL ending in `marketplace.json`**, not that HTML page, a directory URL, a GitHub release page, or a ZIP URL. An error starting with `Unexpected token '<'` means the supplied URL returned HTML instead of JSON.
 
-## The universal package — one URL for every machine, from the next release
+## Recommended: the universal package — one URL for every machine
 
-The universal package bundles five precompiled Rust executables behind a small launcher that selects the one for the running machine. It requires **Node.js 22 or newer** on `PATH` (`node --version`); no Rust toolchain or npm install is needed. It publishes with the **next release**, when it becomes the recommended install and adds the single marketplace URL `https://unknoownu.github.io/oh-my-zcode/marketplace.json` — which does not resolve today.
+The universal package bundles five precompiled Rust executables behind a small launcher that selects the one for the running machine. It requires **Node.js 22 or newer** on `PATH` (`node --version`); no Rust toolchain or npm install is needed. It is live in **3.0.0** and is the recommended install: in **Add marketplace**, paste `https://unknoownu.github.io/oh-my-zcode/marketplace.json`.
 
-That URL and the stable `https://unknoownu.github.io/oh-my-zcode/latest/<target>/marketplace.json` aliases do **not** resolve on the published site today — use the versioned native URLs in the table above now. The universal launcher selects the architecture of the running Node process; use native Node to run natively on Apple Silicon.
+That URL and the stable `https://unknoownu.github.io/oh-my-zcode/latest/<target>/marketplace.json` aliases are live. The versioned native URLs in the table above remain valid; use a native source for the no-Node package. The universal launcher selects the architecture of the running Node process; use native Node to run natively on Apple Silicon.
 
 ## Manual installation and ZIP recovery
 
@@ -68,10 +68,10 @@ Do not paste a ZIP URL into Add marketplace. If ZCode reports `git clone ...zip.
 
 **Routine updates from a stable HTTPS marketplace:** refresh/update the existing marketplace in Plugins settings, update the installed plugin when a newer version is offered, then completely quit and relaunch ZCode and start a new session. Keep the same marketplace identity. The plugin's update notice does not download or install anything.
 
-**Moving from an old identity or reinstalling a same-version package:** changing a marketplace name does not migrate an installed plugin, and an equal version does not trigger an update. When the next release becomes available, move from `oh-my-zcode@oh-my-zcode-<target>` (or a local identity) to `oh-my-zcode@unknoownu` with a clean reinstall:
+**Moving from an old identity or reinstalling a same-version package:** changing a marketplace name does not migrate an installed plugin, and an equal version does not trigger an update. This repair remains **3.0.0**. If you installed an earlier 3.0.0 native distribution, move from `oh-my-zcode@oh-my-zcode-<target>` (or a local identity) to `oh-my-zcode@unknoownu` with a clean reinstall:
 
 1. Identify the existing `betterzcode` or `oh-my-zcode` installation and its marketplace in Plugins settings. Uninstall the old plugin before installing the replacement. If two copies exist, remove the unwanted one there.
-2. Remove an obsolete marketplace only after uninstalling its plugin. Today, use the versioned native JSON URL for your platform above. From the next release, choose the stable universal JSON URL or the stable native JSON URL for your platform if you want to keep the no-Node package; both register as `unknoownu`.
+2. Remove an obsolete marketplace only after uninstalling its plugin. Choose the live universal JSON URL or the stable native JSON URL for your platform if you want to keep the no-Node package; both register as `unknoownu`. The versioned native URLs above also remain valid.
 3. Install one copy, fully restart ZCode, and start a new session. Confirm `/ohmy-plan`, `/ohmy-swarm`, and `/ohmy-research` are available and that the session received the pipeline doctrine.
 
 After moving to `unknoownu`, switching between native and universal URLs replaces the registered source without creating another plugin identity; it does not replace already installed package files. Reinstall when switching package forms at the same version.
@@ -93,7 +93,7 @@ An unavailable optional server does not prevent the bundled gates or scope serve
 
 ## Update notice
 
-At session start the native binary compares the installed version against the [published marketplace](https://unknoownu.github.io/oh-my-zcode/marketplace.json) (that endpoint activates with the next release; today the request fails open and startup is unaffected): one anonymous GET, two-second timeout, `curl` on PATH, no project files, payload, or identifier. A newer version adds `UPDATE oh-my-zcode: <latest> available (installed <v>)` to the doctrine. Offline access, missing curl, or an invalid response does not prevent session startup.
+At session start the native binary compares the installed version against the [published marketplace](https://unknoownu.github.io/oh-my-zcode/marketplace.json): one anonymous GET, two-second timeout, `curl` on PATH, no project files, payload, or identifier. A newer version adds `UPDATE oh-my-zcode: <latest> available (installed <v>)` to the doctrine. Offline access, missing curl, or an invalid response does not prevent session startup.
 
 The check writes its state to `~/.zcode/cli/plugins/data/oh-my-zcode@unknoownu/update-check.json` and runs at most once per 24 hours. Set `"disabled": true` in that JSON file to disable it. `OH_MY_ZCODE_UPDATE_URL` and `OH_MY_ZCODE_UPDATE_STATE` are test/configuration overrides. The universal launcher sets `ZCODE_PLUGIN_ROOT` to the actual installed root before starting the nested Rust executable.
 
