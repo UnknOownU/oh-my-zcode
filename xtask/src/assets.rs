@@ -40,6 +40,7 @@ pub(crate) fn collect(root: &Path) -> Result<Vec<Entry>> {
     for file in [
         "README.md",
         "README_CN.md",
+        "README_FR.md",
         "vendor/codegraph/package.json",
         "vendor/codegraph/package-lock.json",
     ] {

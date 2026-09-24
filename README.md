@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="plugin/docs/brand/banner.svg" alt="Oh My Zcode — Build. Challenge. Prove." width="960">
+  <img src="plugin/docs/brand/banner.png" alt="Oh My Zcode — 17 sealed agents — Build. Challenge. Prove." width="960">
 </p>
 
 # Oh My Zcode
@@ -8,7 +8,7 @@
 > *Sounds harsh. Let's try again.*
 > It still doesn't have to — but now it wants to.
 
-[Plugin guide](plugin/README.md) · [简体中文](plugin/README_CN.md) · [MIT License](LICENSE)
+[Plugin guide](plugin/README.md) · [简体中文](plugin/README_CN.md) · [Français](plugin/README_FR.md) · [MIT License](LICENSE)
 
 <details>
 <summary>Table of Contents</summary>

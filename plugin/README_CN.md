@@ -1,14 +1,14 @@
 <p align="center">
-  <img src="docs/brand/banner.svg" alt="Oh My Zcode — 构建、质疑、证明。" width="960">
+  <img src="docs/brand/banner.png" alt="Oh My Zcode — 17 个封闭 agent — 构建、质疑、证明。" width="960">
 </p>
 
 # Oh My Zcode
 
 > **写代码的 agent 不负责给自己的工作判分；没有打开过的来源不算来源。**
 
-[English](README.md) · [简体中文](README_CN.md)
+[English](README.md) · [简体中文](README_CN.md) · [Français](README_FR.md)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![ZCode Plugin](https://img.shields.io/badge/ZCode-plugin-8A2BE2.svg)](.zcode-plugin/plugin.json) [![GLM](https://img.shields.io/badge/models-GLM-5.3-blueviolet.svg)](docs/routing.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/UnknOownU/oh-my-zcode/blob/main/LICENSE) [![ZCode Plugin](https://img.shields.io/badge/ZCode-plugin-8A2BE2.svg)](.zcode-plugin/plugin.json) [![GLM](https://img.shields.io/badge/models-GLM-5.3-blueviolet.svg)](docs/routing.md)
 
 <details>
 <summary>目录</summary>
@@ -284,4 +284,4 @@ node test_gate.mjs
 
 ## 许可证
 
-插件采用 [MIT License](LICENSE)。可选的 `@colbymchenry/codegraph` 1.5.0 的 MIT 元数据记录在锁文件中；其源代码仓库未在此归档中核验，参见上面的 npm registry 链接。Semgrep、OSV Scanner、grep.app、Node/npm 和 ZAI Coding Plan 遵循各自的条款。
+插件采用 [MIT License](https://github.com/UnknOownU/oh-my-zcode/blob/main/LICENSE)。可选的 `@colbymchenry/codegraph` 1.5.0 的 MIT 元数据记录在锁文件中；其源代码仓库未在此归档中核验，参见上面的 npm registry 链接。Semgrep、OSV Scanner、grep.app、Node/npm 和 ZAI Coding Plan 遵循各自的条款。

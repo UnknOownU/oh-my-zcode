@@ -75,6 +75,9 @@ fn assert_runtime_entries(archive: &mut zip::ZipArchive<fs::File>) -> TestResult
     }
     assert!(names.contains(&"oh-my-zcode/bin/launch.mjs".to_owned()));
     assert!(names.contains(&"oh-my-zcode/README_CN.md".to_owned()));
+    assert!(names.contains(&"oh-my-zcode/README_FR.md".to_owned()));
+    assert!(names.contains(&"oh-my-zcode/docs/brand/banner.png".to_owned()));
+    assert!(names.contains(&"oh-my-zcode/docs/brand/icon.png".to_owned()));
     let scripts: Vec<_> = names
         .iter()
         .filter(|name| {
@@ -95,7 +98,7 @@ fn assert_marketplace(fixture: &Fixture, archive: &[u8]) -> TestResult {
     let plugin = marketplace.plugins.first().ok_or("missing plugin")?;
     assert_eq!(
         plugin.icon,
-        "https://raw.githubusercontent.com/UnknOownU/oh-my-zcode/main/plugin/docs/brand/icon.svg"
+        "https://raw.githubusercontent.com/UnknOownU/oh-my-zcode/main/plugin/docs/brand/icon.png"
     );
     assert_eq!(plugin.version, VERSION);
     assert_eq!(plugin.source.path, "oh-my-zcode");

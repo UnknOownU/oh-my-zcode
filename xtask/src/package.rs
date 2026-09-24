@@ -144,7 +144,7 @@ impl Publication<'_> {
             },
             plugins: [Listing {
                 name: &plugin.name,
-                icon: "https://raw.githubusercontent.com/UnknOownU/oh-my-zcode/main/plugin/docs/brand/icon.svg",
+                icon: "https://raw.githubusercontent.com/UnknOownU/oh-my-zcode/main/plugin/docs/brand/icon.png",
                 version: &plugin.version,
                 description: &plugin.description,
                 source: Source {

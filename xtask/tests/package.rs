@@ -51,6 +51,9 @@ fn packages_only_release_assets_when_local_state_exists() -> TestResult {
     let names: Vec<_> = archive.file_names().collect();
     assert!(names.contains(&"oh-my-zcode/bin/oh-my-zcode.exe"));
     assert!(names.contains(&"oh-my-zcode/README_CN.md"));
+    assert!(names.contains(&"oh-my-zcode/README_FR.md"));
+    assert!(names.contains(&"oh-my-zcode/docs/brand/banner.png"));
+    assert!(names.contains(&"oh-my-zcode/docs/brand/icon.png"));
     assert!(!names.iter().any(|name| {
         let forbidden_extension = std::path::Path::new(name)
             .extension()
@@ -110,7 +113,7 @@ fn binds_marketplace_to_exact_archive_when_packaging() -> TestResult {
         let plugin = market.plugins.first().ok_or("missing plugin")?;
         assert_eq!(
             plugin.icon,
-            "https://raw.githubusercontent.com/UnknOownU/oh-my-zcode/main/plugin/docs/brand/icon.svg"
+            "https://raw.githubusercontent.com/UnknOownU/oh-my-zcode/main/plugin/docs/brand/icon.png"
         );
         let bytes = fs::read(output.join(format!("plugins/oh-my-zcode/{VERSION}/plugin.zip")))?;
         assert_eq!(plugin.source.sha256, hex::encode(Sha256::digest(bytes)));

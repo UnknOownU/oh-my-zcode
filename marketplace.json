@@ -9,7 +9,7 @@
     {
       "name": "oh-my-zcode",
       "source": "./plugin",
-      "icon": "https://raw.githubusercontent.com/UnknOownU/oh-my-zcode/main/plugin/docs/brand/icon.svg",
+      "icon": "https://raw.githubusercontent.com/UnknOownU/oh-my-zcode/main/plugin/docs/brand/icon.png",
       "description": "Evidence-gated ZCode pipeline: separate builders, reviewers and verifiers; PASS requires a matched execution result and unchanged source/artifact fingerprints. Research checks fetched citations; security checks scoped execution and explicit reproduction contracts.",
       "version": "3.0.0",
       "category": "developer-tools",

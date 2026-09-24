@@ -190,8 +190,17 @@ fn check_encoding_entry(
         ));
     } else if metadata.is_dir() {
         directories.push(path.to_owned());
-    } else if metadata.is_file() {
+    } else if metadata.is_file()
+        && !matches!(
+            path.extension().and_then(|extension| extension.to_str()),
+            Some("png" | "jpg" | "webp")
+        )
+    {
         let result = text(path, report);
         report.record(result);
     }
 }
+
+#[cfg(test)]
+#[path = "files_tests.rs"]
+mod files_tests;

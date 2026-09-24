@@ -1,14 +1,14 @@
 <p align="center">
-  <img src="docs/brand/banner.svg" alt="Oh My Zcode — Build. Challenge. Prove." width="960">
+  <img src="docs/brand/banner.png" alt="Oh My Zcode — 17 sealed agents — Build. Challenge. Prove." width="960">
 </p>
 
 # Oh My Zcode
 
 > **An agent that writes is never an agent that judges. A source it never opened is not a source.**
 
-[English](README.md) · [简体中文](README_CN.md)
+[English](README.md) · [简体中文](README_CN.md) · [Français](README_FR.md)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![ZCode Plugin](https://img.shields.io/badge/ZCode-plugin-8A2BE2.svg)](.zcode-plugin/plugin.json) [![GLM](https://img.shields.io/badge/models-GLM-5.3-blueviolet.svg)](docs/routing.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/UnknOownU/oh-my-zcode/blob/main/LICENSE) [![ZCode Plugin](https://img.shields.io/badge/ZCode-plugin-8A2BE2.svg)](.zcode-plugin/plugin.json) [![GLM](https://img.shields.io/badge/models-GLM-5.3-blueviolet.svg)](docs/routing.md)
 
 <details>
 <summary>Table of Contents</summary>
@@ -376,4 +376,4 @@ Versioning follows [docs/versioning.md](docs/versioning.md) — the 1.x line clo
 
 ## License
 
-[MIT License](LICENSE).
+[MIT License](https://github.com/UnknOownU/oh-my-zcode/blob/main/LICENSE).
